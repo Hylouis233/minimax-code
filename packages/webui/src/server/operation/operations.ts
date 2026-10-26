@@ -10,7 +10,12 @@ export { sendMessageOperation, enqueueMessageOperation, resumeSessionOperation }
 export { watchEventsOperation, listPendingPermissionsOperation, getPendingQuestionnaireOperation, replyPermissionOperation, replyQuestionnaireOperation, dismissQuestionnaireOperation } from "./questionnaire.js";
 export { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
 export { pluginManagementOperation } from "./plugin-management.js";
-export { listMiniAppsOperation, openMiniAppOperation, stopMiniAppOperation } from "./miniapp.js";
+export {
+  listMiniAppsOperation,
+  openMiniAppOperation,
+  stopMiniAppOperation,
+  watchMiniAppPresentationOperation,
+} from "./miniapp.js";
 export { getPermissionModeOperation, setPermissionModeOperation } from "./permission-mode.js";
 export { getGlobalInstructionsOperation, setGlobalInstructionsOperation } from "./personalization.js";
 export { getAgentMemoryOperation, setAgentMemoryOperation } from "./agent-memory.js";
@@ -281,6 +286,7 @@ export function createOperationRegistry(
   registerOperation(registry, entry("listMiniApps"));
   registerOperation(registry, entry("openMiniApp"));
   registerOperation(registry, entry("stopMiniApp"));
+  registerOperation(registry, entry("watchMiniAppPresentation"));
   return registry;
 }
 

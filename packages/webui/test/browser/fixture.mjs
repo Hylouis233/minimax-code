@@ -613,6 +613,22 @@ export function installFixtureTransport() {
         });
         return;
       }
+      if (frame.operation === "watchMiniAppPresentation") {
+        // ADR 0020's lease: one frame, and then the socket is held open for as
+        // long as the document lives. A fixture cannot observe a real socket
+        // close, so the release half is proven in `miniapp-operations.test.ts`;
+        // what this proves is the client's half — a standalone document takes the
+        // lease, and the inline document reads `detached` off the catalogue.
+        const scripted = responses.get("watchMiniAppPresentation");
+        this.respond(frame, { stream: true });
+        this.streamFrame({
+          pluginId: frame.body?.pluginId,
+          sessionId: frame.body?.sessionId,
+          presentationRevision: scripted?.presentationRevision ?? 1,
+          session: scripted?.session ?? "live",
+        });
+        return;
+      }
       if (frame.operation === "watchTerminal") {
         // The terminal watch is a stream of `WebuiTerminalFrame`s, and unlike a
         // turn stream it stays open for the life of the process. It is marked

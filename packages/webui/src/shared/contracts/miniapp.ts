@@ -6,7 +6,11 @@
 // | --- | --- | --- | --- |
 // | `WebuiMiniAppRuntimeStatus` | The states a Mini App row can be in, as the runtime reports them. | Runtime `MiniAppSurfaceSummary.runtime.status` (`@mavis/shared/miniapp-surface`), copied field by field in `runtime/harness/miniapp.ts`. | `WebuiMiniAppSummary`; the row a picker renders. |
 // | `WebuiMiniAppSummary` | One catalogue row: identity, display copy and the runtime state, which is what tells a stopped Mini App from a running one. | `listMiniApps` and the `miniApp` half of `openMiniApp` (`runtime/harness/miniapp.ts`; CliService). | `shared/operation-names.ts`; `runtime/port.ts`; `server/operation/handlers/miniapp.ts`. |
-// | `WebuiMiniAppList` | The envelope `listMiniApps` answers with. | `server/operation/handlers/miniapp.ts`. | `shared/operation-names.ts`. |
+// | `WebuiMiniAppList` | The envelope `listMiniApps` answers with, as the runtime answers it: rows and nothing else, because the runtime has no view of presentation. | `runtime/harness/miniapp.ts` (`listMiniApps`; CliService). | `runtime/port.ts`; `server/operation/handlers/miniapp.ts`. |
+// | `WebuiMiniAppPresentation` | Whether a standalone presentation is live for a plugin, and how many times one has been acquired. | `server/operation/handlers/miniapp.ts` from `server/miniapp/presentation-lease.ts` — never a constant. | `WebuiMiniAppCatalogueRow`; `client/features/miniapp/projection/miniapp-view.ts`. |
+// | `WebuiMiniAppCatalogueRow` | One catalogue row as the service answers it: the runtime's row plus the live presentation. | `server/operation/handlers/miniapp.ts`. | `client/features/miniapp/projection/miniapp-view.ts`; `client/features/miniapp/ui/MiniAppView.public.tsx`. |
+// | `WebuiMiniAppCatalogue` | The body `listMiniApps` answers with, presentation facts included. | `server/operation/handlers/miniapp.ts`. | `shared/operation-names.ts`; `client/features/miniapp/contracts/miniapp-port.ts`. |
+// | `WebuiMiniAppPresentationState` | One frame of `watchMiniAppPresentation`: the lease a standalone document took, and whether the session its deep link names is still present. | `server/operation/handlers/miniapp.ts` (the stream's first and only frame). | `client/features/miniapp/application/miniapp-workflows.ts`; `client/features/miniapp/ui/MiniAppStandalone.public.tsx`. |
 // | `WebuiMiniAppView` | Where the client frames a started Mini App: the loopback proxy's URL, with the plugin it belongs to. It never carries the Mini App's own origin, surface path or launch credential. | `openMiniApp` (`server/operation/handlers/miniapp.ts`, from `server/miniapp/proxy.ts` `viewUrl`). | `shared/operation-names.ts`; unverified — no importer yet; the panel that frames `viewUrl` is a later slice of the same work. |
 
 /**
@@ -51,9 +55,61 @@ export interface WebuiMiniAppSummary {
   };
 }
 
-/** The catalogue `listMiniApps` answers with. */
+/** The catalogue `listMiniApps` answers with, as the runtime answers it. */
 export interface WebuiMiniAppList {
   readonly miniApps: readonly WebuiMiniAppSummary[];
+}
+
+/**
+ * The live presentation of one Mini App, as the service records it.
+ *
+ * ADR 0020's lease: the standalone document declares its plugin, session and
+ * presentation when it connects, and the service keeps the record until that
+ * document's socket closes. So `detached` is "a standalone lease exists for this
+ * plugin right now" and `presentationRevision` counts the acquisitions so far —
+ * a fast detach and release that a poll would otherwise miss still moves the
+ * number.
+ *
+ * Produced only from that record (`server/miniapp/presentation-lease.ts`). The
+ * runtime has no view of presentation, which is why these fields are not on
+ * `WebuiMiniAppSummary`: an adapter filling them in would have to invent a
+ * constant.
+ */
+export interface WebuiMiniAppPresentation {
+  readonly detached: boolean;
+  /** Monotonic per plugin, and unchanged by a release. `0` means never acquired. */
+  readonly presentationRevision: number;
+}
+
+/** One catalogue row as the service answers it: the runtime's row and its presentation. */
+export interface WebuiMiniAppCatalogueRow
+  extends WebuiMiniAppSummary,
+    WebuiMiniAppPresentation {}
+
+/** The body `listMiniApps` answers with. */
+export interface WebuiMiniAppCatalogue {
+  readonly miniApps: readonly WebuiMiniAppCatalogueRow[];
+}
+
+/**
+ * One frame of `watchMiniAppPresentation`: the lease this standalone document
+ * took, and what its deep link names.
+ *
+ * `presentationRevision` is the lease's own revision, not the plugin's whole
+ * history: a separate tab that opened and closed before this one is somebody
+ * else's presentation. There is no `detached` field because this document *is* the
+ * standalone presentation — the fact is the connection.
+ *
+ * `session` is `"ended"` only when the runtime confirmed there is no such session.
+ * A lookup that failed for any other reason is a failure, not an ended session.
+ * Either way the answer is reported rather than enforced: the Mini App is
+ * plugin-scoped, so a page outlives the session it was opened from (ADR 0020).
+ */
+export interface WebuiMiniAppPresentationState {
+  readonly pluginId: string;
+  readonly sessionId: string;
+  readonly presentationRevision: number;
+  readonly session: "live" | "ended";
 }
 
 /**

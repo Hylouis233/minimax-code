@@ -26,27 +26,41 @@ import {
 import { MiniAppAppsList } from "../../src/client/features/miniapp/ui/MiniAppAppsList.public.js";
 import { MiniAppPicker } from "../../src/client/features/miniapp/ui/MiniAppPicker.public.js";
 import { MiniAppView } from "../../src/client/features/miniapp/ui/MiniAppView.public.js";
+import { MiniAppStandalone } from "../../src/client/features/miniapp/ui/MiniAppStandalone.public.js";
 import { createMiniAppProxyRegistry } from "../../src/server/miniapp/proxy-registry.js";
 import { miniAppPageBridge } from "../../src/server/miniapp/bridge.js";
-import type { WebuiMiniAppSummary } from "../../src/shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppCatalogueRow,
+  WebuiMiniAppPresentationState,
+  WebuiMiniAppSummary,
+} from "../../src/shared/contracts/miniapp.js";
 
 function summary(
   pluginId: string,
   status: WebuiMiniAppSummary["runtime"]["status"],
   runtime: Partial<WebuiMiniAppSummary["runtime"]> = {},
-): WebuiMiniAppSummary {
+  presentation: { detached?: boolean; presentationRevision?: number } = {},
+): WebuiMiniAppCatalogueRow {
   return {
     pluginId,
     displayName: `${pluginId} 应用`,
     description: "说明",
     runtime: { kind: "process", status, ...runtime },
+    detached: presentation.detached ?? false,
+    presentationRevision: presentation.presentationRevision ?? 0,
   };
 }
 
 function port(input: {
-  readonly miniApps: readonly WebuiMiniAppSummary[];
+  readonly miniApps: readonly WebuiMiniAppCatalogueRow[];
   readonly open?: (pluginId: string) => Promise<{ pluginId: string; viewUrl: string }>;
   readonly stop?: () => Promise<void>;
+  readonly standaloneUrl?: (input: { pluginId: string; sessionId: string }) => string;
+  readonly watch?: (
+    request: { pluginId: string; sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
 }): WebuiMiniAppPortSlice {
   return {
     listMiniApps: async () => ({ miniApps: input.miniApps }),
@@ -56,6 +70,8 @@ function port(input: {
       await input.stop?.();
       return { success: true as const };
     },
+    ...(input.standaloneUrl ? { miniappStandaloneUrl: input.standaloneUrl } : {}),
+    ...(input.watch ? { watchMiniAppPresentation: input.watch } : {}),
   };
 }
 
@@ -231,6 +247,153 @@ describe("the Mini App view the panel frames", () => {
     );
     expect(markup).toContain("pid 99");
     expect(markup).not.toContain("miniapp-view-frame");
+  });
+});
+
+describe("the standalone presentation's controls", () => {
+  const PLUGIN = "dashboard";
+  const SESSION = "session-1";
+  const STANDALONE_URL = `http://127.0.0.1:4123/miniapp?token=t&plugin=${PLUGIN}&session=${SESSION}`;
+
+  function standalonePort(
+    presentation: { detached: boolean; presentationRevision: number },
+  ): WebuiMiniAppPortSlice {
+    return port({
+      miniApps: [summary(PLUGIN, "running", {}, presentation)],
+      standaloneUrl: ({ pluginId, sessionId }) =>
+        `http://127.0.0.1:4123/miniapp?token=t&plugin=${pluginId}&session=${sessionId}`,
+    });
+  }
+
+  it("offers the move from the inline view", async () => {
+    const workflows = createWebuiMiniAppWorkflows({ port: standalonePort({ detached: false, presentationRevision: 0 }) });
+    await workflows.open(PLUGIN);
+    const markup = render(
+      createElement(MiniAppView, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+
+    // The control names the action, and the URL it would open is the service's own
+    // deep link — the client never assembles a Mini App origin.
+    expect(markup).toContain('data-testid="miniapp-open-standalone"');
+    expect(markup).toContain("在新标签页中打开");
+    expect(markup).toContain('data-detached="false"');
+    expect(workflows.standaloneUrl({ pluginId: PLUGIN, sessionId: SESSION })).toBe(STANDALONE_URL);
+  });
+
+  it("reports a live standalone presentation instead of framing a second one", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: standalonePort({ detached: true, presentationRevision: 1 }),
+    });
+    await workflows.loadListing();
+    await workflows.open(PLUGIN);
+    const markup = render(
+      createElement(MiniAppView, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+
+    expect(markup).toContain('data-detached="true"');
+    expect(markup).toContain('data-testid="miniapp-view-detached"');
+    expect(markup).toContain("已在独立的浏览器标签页中打开");
+    expect(markup).toContain('data-testid="miniapp-switch-standalone"');
+    expect(markup).toContain("切换到该标签页");
+    // One presentation at a time: no frame, and no second-tab control.
+    expect(markup).not.toContain("miniapp-view-frame");
+    expect(markup).not.toContain('data-testid="miniapp-open-standalone"');
+  });
+
+  it("renders only the Mini App on the standalone surface, with no way back", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        ...standalonePort({ detached: true, presentationRevision: 1 }),
+        watchMiniAppPresentation: (request, onFrame) => {
+          onFrame({
+            pluginId: request.pluginId,
+            sessionId: request.sessionId,
+            presentationRevision: 1,
+            session: "live",
+          });
+          return () => undefined;
+        },
+      },
+    });
+    await workflows.loadListing();
+    await workflows.open(PLUGIN);
+    // The surface claims the lease in an effect, which SSR does not run, so the
+    // state is established the way the effect establishes it. That the effect
+    // itself fires is the browser suite's half.
+    const release = workflows.claimStandalone({ pluginId: PLUGIN, sessionId: SESSION });
+    const markup = render(
+      createElement(MiniAppStandalone, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+    release();
+
+    expect(markup).toContain('data-testid="miniapp-standalone"');
+    expect(markup).toContain('data-testid="miniapp-view-frame"');
+    // The standalone page is not the inline one: it does not report itself as
+    // elsewhere, and it offers neither the move nor a way back (closing the tab is
+    // the only way back, so an in-page control would be a second one).
+    expect(markup).not.toContain('data-testid="miniapp-view-detached"');
+    expect(markup).not.toContain('data-testid="miniapp-open-standalone"');
+    expect(markup).not.toContain('data-testid="miniapp-switch-standalone"');
+    expect(markup).not.toContain("切换到该标签页");
+    expect(markup).not.toContain("在新标签页中打开");
+  });
+
+  it("keeps showing the Mini App when the deep link names an ended session", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        ...standalonePort({ detached: true, presentationRevision: 2 }),
+        watchMiniAppPresentation: (request, onFrame) => {
+          onFrame({
+            pluginId: request.pluginId,
+            sessionId: request.sessionId,
+            presentationRevision: 2,
+            session: "ended",
+          });
+          return () => undefined;
+        },
+      },
+    });
+    await workflows.loadListing();
+    await workflows.open(PLUGIN);
+    const release = workflows.claimStandalone({ pluginId: PLUGIN, sessionId: SESSION });
+    const markup = render(
+      createElement(MiniAppStandalone, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+    release();
+
+    expect(markup).toContain('data-testid="miniapp-standalone-session-ended"');
+    expect(markup).toContain("该会话已结束");
+    // Reported, not enforced: the app is plugin-scoped and still renders.
+    expect(markup).toContain('data-testid="miniapp-view-frame"');
+  });
+
+  it("reports a refused session lookup as unresolved, never as ended", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        ...standalonePort({ detached: true, presentationRevision: 3 }),
+        watchMiniAppPresentation: (_request, _onFrame, onFailure) => {
+          onFailure?.(new Error("harness unavailable"));
+          return () => undefined;
+        },
+      },
+    });
+    await workflows.loadListing();
+    await workflows.open(PLUGIN);
+    const release = workflows.claimStandalone({ pluginId: PLUGIN, sessionId: SESSION });
+    const markup = render(
+      createElement(MiniAppStandalone, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+    release();
+
+    expect(markup).toContain('data-testid="miniapp-standalone-session-unresolved"');
+    expect(markup).toContain("无法确认会话状态");
+    expect(markup).toContain("harness unavailable");
+    expect(markup).not.toContain("该会话已结束");
   });
 });
 

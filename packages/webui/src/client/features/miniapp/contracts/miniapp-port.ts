@@ -1,7 +1,8 @@
 // Mini App capability port.
 //
 // The three operations the WebUI's Mini App business drives: the catalogue, the
-// launch and the stop. Split from the monolithic transport the way every other
+// launch and the stop, plus the standalone presentation lease and the deep link
+// that opens one. Split from the monolithic transport the way every other
 // business's port is, and composed by `transport.ts`.
 //
 // Every method stays optional — `undefined` means "the operation is not wired",
@@ -12,17 +13,26 @@
 // Two things are deliberately absent. The Mini App's own origin, its surface path
 // and the launch credential never appear here: the server holds them and the
 // client is handed the proxy's `viewUrl` (`shared/contracts/miniapp.ts`). And
-// there is no "detach"/"attach": the two presentations of ADR 0020 are two client
-// documents, so what a client asks for is a view URL, not a page move.
+// there is no "attach": returning to the inline presentation is closing the
+// standalone tab, which releases the lease — the standalone page has no control
+// that would need one (ADR 0020).
 
 import type {
-  WebuiMiniAppList,
+  WebuiMiniAppCatalogue,
+  WebuiMiniAppPresentationState,
   WebuiMiniAppView,
 } from "../../../../shared/contracts/miniapp.js";
 
 export interface MiniAppPort {
-  /** The installed Mini Apps, with the runtime state the row renders. */
-  readonly listMiniApps?: () => Promise<WebuiMiniAppList>;
+  /**
+   * The installed Mini Apps, with the runtime state and the live presentation the
+   * row renders.
+   *
+   * `detached` and `presentationRevision` are the service's record, which is why
+   * this answers `WebuiMiniAppCatalogue` and not the runtime's own list: what a
+   * row says about presentation is not something the runtime knows.
+   */
+  readonly listMiniApps?: () => Promise<WebuiMiniAppCatalogue>;
   /**
    * Starts one Mini App and answers with the loopback URL the panel frames.
    *
@@ -38,4 +48,29 @@ export interface MiniAppPort {
   readonly stopMiniApp?: (request: {
     readonly pluginId: string;
   }) => Promise<{ readonly success: true }>;
+  /**
+   * Declares this document as the standalone presentation of one Mini App, and
+   * holds the lease until the returned function is called.
+   *
+   * This is the whole of ADR 0020's lease from the client's side: the call opens a
+   * connection the service holds the record against, the first frame says what the
+   * lease is (its revision, and whether the deep link's session is still live),
+   * and the release is that subscription ending — which is what closing the tab
+   * does to it.
+   */
+  readonly watchMiniAppPresentation?: (
+    request: { readonly pluginId: string; readonly sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    /**
+     * The lease could not be established — a refused session lookup, a missing
+     * capability. Reported rather than folded into "no lease", because a stand-in
+     * that cannot answer is not a closed tab.
+     */
+    onFailure?: (error: Error) => void,
+  ) => () => void;
+  /** The standalone page's URL, token included. Built by the wire, not the UI. */
+  readonly miniappStandaloneUrl?: (request: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }) => string;
 }

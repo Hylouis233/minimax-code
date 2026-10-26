@@ -21,7 +21,10 @@
 
 import type { PluginPort } from "../../plugins/contracts/plugin-port.js";
 import { createWebuiPluginActions } from "../../plugins/contracts/plugin-actions.js";
-import type { WebuiMiniAppList } from "../../../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppCatalogue,
+  WebuiMiniAppCatalogueRow,
+} from "../../../../shared/contracts/miniapp.js";
 import type { MiniAppPort } from "../contracts/miniapp-port.js";
 import {
   webuiMiniAppRows,
@@ -29,10 +32,10 @@ import {
   type WebuiMiniAppRow,
 } from "../projection/miniapp-view.js";
 
-/** The port members this business drives: its own three, and the package lifecycle. */
+/** The port members this business drives: its own five, and the package lifecycle. */
 export type WebuiMiniAppPortSlice = Pick<
   MiniAppPort,
-  "listMiniApps" | "openMiniApp" | "stopMiniApp"
+  "listMiniApps" | "openMiniApp" | "stopMiniApp" | "watchMiniAppPresentation" | "miniappStandaloneUrl"
 > &
   Pick<PluginPort, "pluginManagement">;
 
@@ -63,6 +66,20 @@ export interface WebuiMiniAppListing {
   readonly error?: string;
 }
 
+/**
+ * The presentation this document holds, when it is the standalone one.
+ *
+ * Only a standalone page has this: it is the frame the service answered its lease
+ * with, so it carries what that lease is (the revision) and what the deep link
+ * named (the session, and whether the runtime still answers for it).
+ */
+export interface WebuiMiniAppStandalone {
+  readonly pluginId: string;
+  readonly sessionId: string;
+  readonly presentationRevision: number;
+  readonly session: "live" | "ended";
+}
+
 export interface WebuiMiniAppWorkflowsState {
   readonly listing: WebuiMiniAppListing;
   /** Per plugin: the presentation this client holds. */
@@ -71,6 +88,21 @@ export interface WebuiMiniAppWorkflowsState {
   readonly refusals: Readonly<Record<string, WebuiMiniAppRefusal>>;
   /** The plugin whose start is in flight, so its row can say so. */
   readonly opening?: string;
+  /**
+   * The standalone presentation this document declared, once the service answered.
+   *
+   * Absent on an inline client, and absent on a standalone one until the lease's
+   * first frame arrives — a host that does not wire the operation never sets it,
+   * and the page then renders without a presentation notice rather than refusing.
+   */
+  readonly standalone?: WebuiMiniAppStandalone;
+  /**
+   * Why the standalone lease could not be established, when it could not.
+   *
+   * Distinct from an absent `standalone`: that is "no answer yet", this is "the
+   * host answered with a failure". Neither is reported as an ended session.
+   */
+  readonly standaloneFailure?: string;
   /**
    * The capability's absence, when the host has no Mini App cell at all.
    *
@@ -130,6 +162,30 @@ export interface WebuiMiniAppWorkflows {
    */
   readonly syncPresentations: () => Promise<void>;
 
+  /**
+   * The standalone page for one Mini App, or `undefined` when the host does not
+   * wire the route.
+   *
+   * The URL is built by the wire because it carries the service token; a UI that
+   * assembled it would have to hold the credential, which is the one thing the
+   * client is never given.
+   */
+  readonly standaloneUrl: (input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }) => string | undefined;
+  /**
+   * Declare this document as the standalone presentation, and hold the lease.
+   *
+   * Returns the release. The service ties the lease to the connection this opens,
+   * so calling it is what makes `detached` true for the inline view, and the
+   * release — a closed tab, an unmount — is what makes it false again.
+   */
+  readonly claimStandalone: (input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }) => () => void;
+
   /** Package lifecycle, for the catalogue's apps area. */
   readonly setPluginEnabled: (pluginId: string, enabled: boolean) => Promise<void>;
   readonly uninstall: (pluginId: string) => Promise<void>;
@@ -152,7 +208,7 @@ export function createWebuiMiniAppWorkflows(deps: {
       };
   const listeners = new Set<() => void>();
   /** One catalogue read at a time: a second read while one is open is that read. */
-  let inFlight: Promise<WebuiMiniAppList | undefined> | undefined;
+  let inFlight: Promise<WebuiMiniAppCatalogue | undefined> | undefined;
 
   const set = (
     update: (current: WebuiMiniAppWorkflowsState) => WebuiMiniAppWorkflowsState,
@@ -184,7 +240,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     });
   };
 
-  const readCatalogue = async (): Promise<WebuiMiniAppList | undefined> => {
+  const readCatalogue = async (): Promise<WebuiMiniAppCatalogue | undefined> => {
     if (!port.listMiniApps) return undefined;
     const list = await port.listMiniApps();
     // A host that answers nothing, or something else, is an empty catalogue rather
@@ -279,6 +335,63 @@ export function createWebuiMiniAppWorkflows(deps: {
     });
   };
 
+  /**
+   * The standalone page, when the wire can build one.
+   *
+   * `undefined` rather than a hand-built path when the member is unwired: a link
+   * the client assembled itself would either omit the service token or carry one
+   * this layer does not hold.
+   */
+  const standaloneUrl = (input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): string | undefined => port.miniappStandaloneUrl?.(input);
+
+  /**
+   * Take the standalone lease, and keep it until the returned release is called.
+   *
+   * The first frame is the service's answer about the lease; it is kept in the
+   * snapshot so the standalone surface can say what its deep link named. Nothing
+   * here starts the Mini App — the view does that, through `open`, exactly as the
+   * inline one does.
+   */
+  const claimStandalone = (input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): (() => void) => {
+    if (!available || !port.watchMiniAppPresentation) return () => undefined;
+    return port.watchMiniAppPresentation(
+      input,
+      (frame) => {
+        if (frame.pluginId !== input.pluginId) return;
+        set((current) => {
+          const next: WebuiMiniAppWorkflowsState = {
+            ...current,
+            standalone: {
+              pluginId: frame.pluginId,
+              sessionId: frame.sessionId,
+              presentationRevision: frame.presentationRevision,
+              session: frame.session,
+            },
+          };
+          if (current.standaloneFailure === undefined) return next;
+          const cleared = { ...next };
+          delete cleared.standaloneFailure;
+          return cleared;
+        });
+      },
+      // A refused lease is a failure this surface reports. It is deliberately not
+      // stored as `standalone.session = "ended"`: nothing here knows what the
+      // session is, only that the service could not say.
+      (error) => {
+        set((current) => ({
+          ...current,
+          standaloneFailure: error.message,
+        }));
+      },
+    );
+  };
+
   const mutatePlugin = async (
     action: "enablePlugin" | "disablePlugin" | "uninstallPlugin",
     pluginId: string,
@@ -306,6 +419,8 @@ export function createWebuiMiniAppWorkflows(deps: {
     open,
     stop,
     syncPresentations,
+    standaloneUrl,
+    claimStandalone,
     setPluginEnabled: (pluginId, enabled) =>
       mutatePlugin(enabled ? "enablePlugin" : "disablePlugin", pluginId),
     uninstall: (pluginId) => mutatePlugin("uninstallPlugin", pluginId),

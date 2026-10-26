@@ -241,6 +241,8 @@ const MINIAPP_KEYS = [
   "listMiniApps",
   "openMiniApp",
   "stopMiniApp",
+  "watchMiniAppPresentation",
+  "miniappStandaloneUrl",
   "pluginManagement",
 ] as const satisfies readonly (keyof MiniAppPort | keyof PluginPort)[];
 

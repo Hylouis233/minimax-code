@@ -165,13 +165,17 @@ export const GET_USER_PROFILE_OPERATION_NAME = "getUserProfile" as const;
 export const SET_USER_PROFILE_OPERATION_NAME = "setUserProfile" as const;
 export const GET_MEMORY_SETTINGS_OPERATION_NAME = "getMemorySettings" as const;
 export const SET_MEMORY_SETTINGS_OPERATION_NAME = "setMemorySettings" as const;
-// The Mini App surface. Three operations over one runtime capability: the
-// catalogue, the launch, and the stop. `openMiniApp` answers with a loopback
-// view URL rather than the Mini App's own coordinates, so the credential the
-// Mini App's guard demands never leaves the server.
+// The Mini App surface. Four operations over one runtime capability: the
+// catalogue, the launch, the stop, and the standalone presentation lease.
+// `openMiniApp` answers with a loopback view URL rather than the Mini App's own
+// coordinates, so the credential the Mini App's guard demands never leaves the
+// server. `watchMiniAppPresentation` is a stream rather than a request because
+// its lifetime is the standalone document's, not one round trip's (ADR 0020:
+// the lease is released when that client's socket closes).
 export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
 export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
 export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
+export const WATCH_MINI_APP_PRESENTATION_OPERATION_NAME = "watchMiniAppPresentation" as const;
 
 import type {
   WebuiActiveTurnResult,
@@ -305,7 +309,8 @@ import type {
 } from "./contracts/terminal.js";
 import type { WebuiPluginManagementRequest } from "./plugin-management.js";
 import type {
-  WebuiMiniAppList,
+  WebuiMiniAppCatalogue,
+  WebuiMiniAppPresentationState,
   WebuiMiniAppView,
 } from "./contracts/miniapp.js";
 
@@ -768,9 +773,12 @@ export interface OperationSpec {
   };
   /**
    * The Mini App catalogue. A row's `runtime.status` is why this is not just a
-   * plugin list: the picker offers "open" or "stop" from it.
+   * plugin list: the picker offers "open" or "stop" from it. A row's
+   * `detached`/`presentationRevision` are the service's own record, which is why
+   * the response is `WebuiMiniAppCatalogue` and not the runtime's
+   * `WebuiMiniAppList`.
    */
-  listMiniApps: { request: undefined; response: WebuiMiniAppList };
+  listMiniApps: { request: undefined; response: WebuiMiniAppCatalogue };
   /**
    * Starts one Mini App and names where to frame it.
    *
@@ -787,6 +795,19 @@ export interface OperationSpec {
   stopMiniApp: {
     request: { readonly pluginId: string };
     response: { readonly success: true };
+  };
+  /**
+   * The standalone presentation lease (ADR 0020).
+   *
+   * A standalone document declares its plugin, its session and its presentation
+   * by connecting; the lease lives as long as that socket does, which is what
+   * makes `detached` in the catalogue a live fact instead of a constant. It is a
+   * stream for exactly that reason: a unary request would settle in milliseconds
+   * and release the record with it.
+   */
+  watchMiniAppPresentation: {
+    request: { readonly pluginId: string; readonly sessionId: string };
+    response: WebuiMiniAppPresentationStreamEnvelope;
   };
 }
 
@@ -808,6 +829,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_TERMINAL_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -847,6 +869,20 @@ export interface WebuiBrowserWebTabStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
+  };
+}
+
+/**
+ * The `{ stream }` envelope for the standalone presentation lease.
+ *
+ * Named after the operation rather than its frames because the stream's value is
+ * its lifetime: one frame says what the lease is, and the socket staying open is
+ * what keeps it. A `[DONE]` would mean the presentation ended.
+ */
+export interface WebuiMiniAppPresentationStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppPresentationState>;
   };
 }
 

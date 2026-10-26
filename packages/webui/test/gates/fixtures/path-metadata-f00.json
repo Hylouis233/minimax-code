@@ -4853,6 +4853,24 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/features/miniapp/ui/MiniAppStandalone.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "server/miniapp/presentation-lease.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
     }
   ],
   "directions": [

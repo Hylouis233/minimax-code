@@ -1,17 +1,22 @@
 // Dedicated handlers: the Mini App surface.
 //
-// None of the three can be a plain binding. `openMiniApp` shapes its response —
+// None of the four can be a plain binding. `openMiniApp` shapes its response —
 // the client is handed the loopback proxy's URL, never the Mini App's own origin
 // or the credential its guard demands — and `stopMiniApp` owns the other half of
 // that proxy's lifetime. `listMiniApps` keeps their company rather than becoming a
-// lone binding because the three answer one capability: a host either has Mini
-// Apps or it has none, and the refusal has to be the same message whichever of the
-// three is asked first.
+// lone binding because they answer one capability: a host either has Mini Apps or
+// it has none, and the refusal has to be the same message whichever of them is
+// asked first. `watchMiniAppPresentation` adds the one thing the runtime cannot
+// answer at all: the service's own record of which presentation is live.
 //
 // One listener per plugin, held in this closure. The proxy's port is derived from
 // the plugin id, so a second listener for the same plugin would either fail to
 // bind or serve the page from a second origin and silently discard the page's own
 // storage. `open` therefore replaces the listener it finds, and `stop` closes it.
+//
+// One presentation lease per plugin, held in the same closure and for the same
+// reason: it describes this service's presentations, not the runtime's state
+// (`../../miniapp/presentation-lease.ts`).
 import { WebuiCapabilityUnavailableError } from "../../../shared/envelope.js";
 import { MINIAPP_CAPABILITY_ABSENT } from "../../../runtime/port.js";
 import type { WebuiOperationPort } from "../bind-handlers.js";
@@ -19,6 +24,7 @@ import {
   listMiniAppsOperation,
   openMiniAppOperation,
   stopMiniAppOperation,
+  watchMiniAppPresentationOperation,
 } from "../miniapp.js";
 import {
   startMiniAppProxy,
@@ -29,7 +35,12 @@ import {
   createMiniAppProxyRegistry,
   type MiniAppProxyRegistry,
 } from "../../miniapp/proxy-registry.js";
+import { createMiniAppPresentationLeases } from "../../miniapp/presentation-lease.js";
 import { miniAppPageBridge } from "../../miniapp/bridge.js";
+import type {
+  WebuiMiniAppCatalogue,
+  WebuiMiniAppPresentationState,
+} from "../../../shared/contracts/miniapp.js";
 import type {
   WebuiOperationContext,
   WebuiOperationHandler,
@@ -98,6 +109,29 @@ export interface MiniAppHandlerOptions {
   readonly proxies?: MiniAppProxyRegistry;
 }
 
+/**
+ * Whether a lookup failed because the session is not there.
+ *
+ * The runtime answers a missing session with an `AppError` carrying `status: 404`
+ * and `key: "SESSION_NOT_FOUND"`; an adapter on another host could carry the code
+ * instead, so both spellings are accepted. Nothing else is — a transport failure,
+ * a refused capability or a thrown string says nothing about the session.
+ */
+function isConfirmedMissingSession(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { status, key, code } = error as {
+    readonly status?: unknown;
+    readonly key?: unknown;
+    readonly code?: unknown;
+  };
+  return (
+    status === 404 ||
+    key === "SESSION_NOT_FOUND" ||
+    code === "SESSION_NOT_FOUND" ||
+    code === "not_found"
+  );
+}
+
 export function createMiniAppHandlerEntries(
   port: WebuiOperationPort,
   options: MiniAppHandlerOptions = {},
@@ -152,9 +186,120 @@ export function createMiniAppHandlerEntries(
     await proxies.close(pluginId);
   }
 
-  const listMiniApps: DedicatedHandler<typeof listMiniAppsOperation> = async () => ({
-    body: await requireMiniApps(port).list.call(port),
-  });
+  /**
+   * Which presentations are live, and how many each plugin has had.
+   *
+   * Per handler set, so per service: the record describes the documents this
+   * service is serving, and two services (a restart, a test) have no business
+   * sharing one.
+   */
+  const presentations = createMiniAppPresentationLeases();
+
+  /**
+   * Whether the deep link's session is still there.
+   *
+   * `getSession` is the port's existing lookup, not a new capability: the
+   * standalone presentation needs to say what its link named, and the session
+   * business already answers that.
+   *
+   * Only a **confirmed absence** is `"ended"` — the runtime's own
+   * `SESSION_NOT_FOUND`. Everything else is rethrown, because a host whose lookup
+   * failed has said nothing about the person's session, and reporting that as
+   * "ended" would turn an infrastructure failure into a fact about their data.
+   * The stream then fails and the standalone surface says it could not confirm the
+   * session, which is the honest state.
+   */
+  async function sessionStateOf(sessionId: string): Promise<"live" | "ended"> {
+    const lookup = await port.getSession({ id: sessionId }).catch((error: unknown) => {
+      if (isConfirmedMissingSession(error)) return undefined;
+      throw error;
+    });
+    return lookup?.session ? "live" : "ended";
+  }
+
+  /**
+   * The lease, held for as long as the caller's socket lives.
+   *
+   * One frame states the presentation; the stream then stays open, and the lease
+   * is released when the stream is finished. Two things finish it and both reach
+   * the same `finally`: the dispatcher breaks its pump when the connection's
+   * signal aborts and then calls `return()`, and a consumer that stops reading
+   * closes the socket, which aborts that same signal. Nothing here times out — a
+   * tab is open until the person closes it.
+   */
+  async function* presentationSource(input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+    readonly session: "live" | "ended";
+    readonly signal?: AbortSignal;
+  }): AsyncGenerator<WebuiMiniAppPresentationState> {
+    const lease = presentations.acquire({
+      pluginId: input.pluginId,
+      sessionId: input.sessionId,
+    });
+    try {
+      yield {
+        pluginId: lease.pluginId,
+        sessionId: lease.sessionId,
+        presentationRevision: lease.presentationRevision,
+        session: input.session,
+      };
+      // No signal means no connection lifetime to hold the lease for, so the
+      // frame is the whole answer rather than a lease nobody can release.
+      if (!input.signal) return;
+      if (input.signal.aborted) return;
+      await new Promise<void>((resolve) => {
+        input.signal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+    } finally {
+      presentations.release(lease);
+    }
+  }
+
+  /**
+   * The runtime's catalogue, with this service's presentation beside each row.
+   *
+   * The two fields are read from the lease record at the moment of the read, which
+   * is what makes them a live fact: the inline view polls this operation, so a
+   * standalone tab opening or closing changes the next answer.
+   */
+  const listMiniApps: DedicatedHandler<typeof listMiniAppsOperation> = async () => {
+    const catalogue = await requireMiniApps(port).list.call(port);
+    const miniApps = Array.isArray(catalogue?.miniApps) ? catalogue.miniApps : [];
+    const body: WebuiMiniAppCatalogue = {
+      miniApps: miniApps.map((row) => ({
+        ...row,
+        detached: presentations.detached(row.pluginId),
+        presentationRevision: presentations.revision(row.pluginId),
+      })),
+    };
+    return { body };
+  };
+
+  const watchMiniAppPresentation: DedicatedHandler<
+    typeof watchMiniAppPresentationOperation
+  > = async (context: WebuiOperationContext, body) => {
+    // The lease presupposes the capability: presenting a Mini App a host cannot
+    // list or stop is not a presentation, and the refusal must be the same one the
+    // other three answer.
+    requireMiniApps(port);
+    return {
+      stream: {
+        ok: true,
+        // The cast is the pattern the terminal watcher uses: the handler contract
+        // admits the two data streams by name, while a watcher's frame type is its
+        // own. The frame shape is declared on the descriptor
+        // (`WebuiMiniAppPresentationStreamEnvelope`), which is where the client
+        // reads it from.
+        source: presentationSource({
+          pluginId: body.pluginId,
+          sessionId: body.sessionId,
+          session: await sessionStateOf(body.sessionId),
+          ...(context.signal ? { signal: context.signal } : {}),
+        }) as unknown as AsyncIterable<Record<string, unknown>>,
+      },
+    };
+  };
 
   const openMiniApp: DedicatedHandler<typeof openMiniAppOperation> = async (
     context: WebuiOperationContext,
@@ -227,6 +372,13 @@ export function createMiniAppHandlerEntries(
       {
         operation: stopMiniAppOperation,
         handle: stopMiniApp as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      watchMiniAppPresentationOperation.name,
+      {
+        operation: watchMiniAppPresentationOperation,
+        handle: watchMiniAppPresentation as WebuiOperationHandler<unknown>,
       },
     ],
   ]);

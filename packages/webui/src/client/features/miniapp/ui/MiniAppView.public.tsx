@@ -1,12 +1,13 @@
-// The Mini App view the workspace panel frames.
+// The Mini App view the workspace panel frames, and the standalone page reuses.
 //
 // Published by the Mini App business because the state it renders is this
 // business's: which view URL a Mini App is presented at, whether it is starting,
-// and why a view was cleared. The panel mounts it for its `miniapp` tab kind and
-// stays the layout owner; it learns nothing about Mini Apps beyond the plugin id
-// its tab carries.
+// why a view was cleared, and whether the same Mini App is already on screen in a
+// browser tab of its own. The panel mounts it for its `miniapp` tab kind and stays
+// the layout owner; it learns nothing about Mini Apps beyond the plugin id its tab
+// carries.
 //
-// Two properties are worth stating, because both were decisions:
+// Four properties are worth stating, because all four were decisions:
 //
 //   * **The iframe is not sandboxed.** Isolation is origin separation (ADR 0020):
 //     the document comes from the proxy's own loopback origin, so it runs in its
@@ -17,6 +18,14 @@
 //     remembers why it was cleared and offers one button to reopen it. Nothing
 //     reopens on its own: a tab may be unattended, and a retry loop would restart
 //     an application the person did not ask for.
+//   * **One presentation is live at a time.** While a standalone tab holds the
+//     lease, this view reports that and offers to switch to it — it does not frame
+//     a second presentation and does not start anything. `detached` comes from the
+//     service's record, not from this component's own guess.
+//   * **The standalone page has no way back.** `surface="standalone"` renders the
+//     same view without the move controls, because returning is closing the tab
+//     and that releases the lease (ADR 0020). It also claims the browsing-context
+//     name the inline control focuses.
 
 import {
   useCallback,
@@ -40,7 +49,10 @@ import {
   webuiMiniAppBridgeRequest,
   webuiMiniAppBridgeSenderAllowed,
 } from "../application/miniapp-bridge.js";
-import { webuiMiniAppRefusalText } from "../projection/miniapp-view.js";
+import {
+  webuiMiniAppRefusalText,
+  webuiMiniAppWindowName,
+} from "../projection/miniapp-view.js";
 
 /**
  * How often an open view asks the runtime whether it is still up.
@@ -48,8 +60,13 @@ import { webuiMiniAppRefusalText } from "../projection/miniapp-view.js";
  * One read of a small catalogue. A Mini App can stop without this client asking,
  * and the alternative to asking is a frame that silently serves a dead page — the
  * case ADR 0020 calls out ("a stopped runtime clears the view and reports why").
+ * The same read is what tells this view that a standalone tab took the
+ * presentation, or gave it back.
  */
 const PRESENTATION_SYNC_MS = 2_000;
+
+/** Which of ADR 0020's two presentations is mounting this view. */
+export type WebuiMiniAppSurface = "inline" | "standalone";
 
 export interface MiniAppViewProps {
   readonly pluginId: string;
@@ -57,9 +74,21 @@ export interface MiniAppViewProps {
   readonly sessionId?: string;
   /** The tab's own title, when the panel has one. */
   readonly title?: string;
+  /**
+   * The presentation this view is, `inline` by default.
+   *
+   * The only difference is the move controls: an inline view offers to open a
+   * standalone one and to switch to it, while the standalone view offers neither.
+   */
+  readonly surface?: WebuiMiniAppSurface;
 }
 
-export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): ReactElement {
+export function MiniAppView({
+  pluginId,
+  sessionId,
+  title,
+  surface = "inline",
+}: MiniAppViewProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const composer = useWebuiComposerStore();
@@ -67,6 +96,14 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
   const refusal = state.refusals[pluginId];
   const row = state.listing.rows.find((candidate) => candidate.pluginId === pluginId);
   const name = row?.name ?? pluginId;
+  const standalone = surface === "standalone";
+  /**
+   * Whether another document is presenting this Mini App right now.
+   *
+   * Never true for the standalone surface: it is the document holding the lease,
+   * so reporting itself as "open elsewhere" would be the one wrong answer.
+   */
+  const detached = !standalone && row?.detached === true;
   const frameRef = useRef<HTMLIFrameElement>(null);
   /** Whether this mount has already asked for the view. A retry is a person's. */
   const asked = useRef(false);
@@ -75,13 +112,23 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
    * The first show starts the Mini App — that is what opening a tab means.
    *
    * Only the first: a presentation that was cleared stays cleared until the
-   * person presses the button, so a refusal cannot turn into a retry loop.
+   * person presses the button, so a refusal cannot turn into a retry loop. The
+   * catalogue is read first, because a standalone tab may already be presenting
+   * this Mini App, and starting a second presentation of it is exactly what the
+   * person is told is not happening.
    */
   useEffect(() => {
     if (!workflows || presentation !== undefined || asked.current) return;
     asked.current = true;
-    void workflows.open(pluginId);
-  }, [pluginId, presentation, workflows]);
+    void (async () => {
+      if (!row) await workflows.loadListing();
+      const known = workflows
+        .getSnapshot()
+        .listing.rows.find((candidate) => candidate.pluginId === pluginId);
+      if (!standalone && known?.detached === true) return;
+      await workflows.open(pluginId);
+    })();
+  }, [pluginId, presentation, row, standalone, workflows]);
 
   /** While a view is up, the runtime is asked whether it still is. */
   useEffect(() => {
@@ -89,6 +136,32 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
     const timer = setInterval(() => void workflows.syncPresentations(), PRESENTATION_SYNC_MS);
     return () => clearInterval(timer);
   }, [presentation?.kind, workflows]);
+
+  /**
+   * Claim the tab's browsing-context name, so the inline view can focus it.
+   *
+   * A tab opened by the inline control already has the name it was opened with; a
+   * tab reached by a pasted deep link does not, and without this the inline view's
+   * switch would open one more document instead of focusing this one.
+   */
+  useEffect(() => {
+    if (!standalone) return;
+    window.name = webuiMiniAppWindowName(pluginId);
+  }, [pluginId, standalone]);
+
+  /** Open the standalone page, or focus the tab that already holds it. */
+  const standaloneHref =
+    !standalone && sessionId !== undefined
+      ? workflows?.standaloneUrl({ pluginId, sessionId })
+      : undefined;
+
+  const moveToStandalone = useCallback((): void => {
+    if (!standaloneHref) return;
+    // A named context is reused when it exists, which is what makes the switch a
+    // switch: same URL, same name, and the browser focuses the document that is
+    // already there rather than creating a second one.
+    window.open(standaloneHref, webuiMiniAppWindowName(pluginId));
+  }, [pluginId, standaloneHref]);
 
   const answer = useCallback(
     (target: Window, origin: string, reply: { requestId: string; result: WebuiMiniAppComposerResult }) => {
@@ -109,7 +182,7 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
    * has nothing this client would say to it.
    */
   useEffect(() => {
-    if (presentation?.kind !== "open") return;
+    if (presentation?.kind !== "open" || detached) return;
     const viewUrl = presentation.viewUrl;
     const onMessage = (event: MessageEvent): void => {
       const request = webuiMiniAppBridgeRequest(event.data);
@@ -142,7 +215,17 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [answer, composer, name, presentation, sessionId]);
+  }, [answer, composer, detached, name, presentation, sessionId]);
+
+  /**
+   * Whether this view can offer the move at all.
+   *
+   * A session is required because the deep link names one, and the URL comes from
+   * the wire because it carries the service token. A host that wires neither is a
+   * host where the standalone presentation does not exist, and the view then
+   * simply does not offer it rather than offering a control that does nothing.
+   */
+  const canMove = !standalone && !detached && standaloneHref !== undefined;
 
   return (
     <div
@@ -150,14 +233,29 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
       data-testid="miniapp-view"
       data-plugin-id={pluginId}
       data-state={presentation?.kind ?? "idle"}
+      data-surface={surface}
+      data-detached={detached ? "true" : "false"}
     >
-      {presentation?.kind === "opening" ? (
+      {presentation?.kind === "opening" && !detached ? (
         <p className="webui-miniapp-view-status" role="status">
           正在启动 {name}…
         </p>
       ) : null}
-      {presentation?.kind === "open" ? (
+      {detached ? (
+        <div className="webui-miniapp-view-detached" data-testid="miniapp-view-detached">
+          <p role="status">已在独立的浏览器标签页中打开。</p>
+          <button type="button" data-testid="miniapp-switch-standalone" onClick={moveToStandalone}>
+            切换到该标签页
+          </button>
+        </div>
+      ) : null}
+      {presentation?.kind === "open" && !detached ? (
         <iframe
+          // Keyed on the presentation revision so a lease that came and went
+          // remounts the frame: the page's in-page state is gone either way
+          // (ADR 0020), and a stale document would otherwise keep rendering from
+          // an origin the service has already re-pointed.
+          key={`${pluginId}:${row?.presentationRevision ?? 0}`}
           ref={frameRef}
           className="webui-miniapp-view-frame"
           data-testid="miniapp-view-frame"
@@ -165,7 +263,14 @@ export function MiniAppView({ pluginId, sessionId, title }: MiniAppViewProps): R
           src={presentation.viewUrl}
         />
       ) : null}
-      {presentation?.kind === "stopped" ? (
+      {canMove ? (
+        <div className="webui-miniapp-view-move">
+          <button type="button" data-testid="miniapp-open-standalone" onClick={moveToStandalone}>
+            在新标签页中打开
+          </button>
+        </div>
+      ) : null}
+      {presentation?.kind === "stopped" && !detached ? (
         <div className="webui-miniapp-view-stopped" data-testid="miniapp-view-stopped">
           <p role="alert">{presentation.reason}</p>
           <button type="button" onClick={() => void workflows?.open(pluginId)}>

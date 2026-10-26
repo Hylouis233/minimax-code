@@ -28,6 +28,7 @@ import {
   listMiniAppsOperation,
   openMiniAppOperation,
   stopMiniAppOperation,
+  watchMiniAppPresentationOperation,
 } from "../../src/server/operation/miniapp.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import type { WebuiOperationRegistryEntry } from "../../src/server/operation/operation-contract.js";
@@ -39,7 +40,10 @@ import {
   type StartMiniAppProxyInput,
 } from "../../src/server/miniapp/proxy.js";
 import { WebuiErrorCode } from "../../src/shared/envelope.js";
-import type { WebuiMiniAppSummary } from "../../src/shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppPresentationState,
+  WebuiMiniAppSummary,
+} from "../../src/shared/contracts/miniapp.js";
 
 const CREDENTIAL = "miniapp-credential-0123456789";
 const SECOND_CREDENTIAL = "miniapp-credential-9876543210";
@@ -89,9 +93,16 @@ afterAll(async () => {
 interface FacadeCalls {
   readonly opened: Array<{ readonly pluginId: string; readonly signal?: AbortSignal }>;
   readonly stopped: string[];
+  /** Every session id the lease asked about. */
+  readonly sessions: string[];
   /** Makes the next open of this plugin answer with a fresh credential. */
   rotateCredential(pluginId: string, credential: string): void;
+  /** How the session lookup answers for this id. */
+  setSession(sessionId: string, answer: SessionAnswer): void;
 }
+
+/** How the scripted runtime answers `getSession`. */
+type SessionAnswer = "live" | "missing" | "broken";
 
 /**
  * The runtime side, scripted. It answers exactly what the port declares: publishable
@@ -100,6 +111,8 @@ interface FacadeCalls {
 function createFacade(): { readonly port: WebuiOperationPort; readonly calls: FacadeCalls } {
   const opened: Array<{ pluginId: string; signal?: AbortSignal }> = [];
   const stopped: string[] = [];
+  const sessions: string[] = [];
+  const sessionAnswers = new Map<string, SessionAnswer>();
   const credentials = new Map<string, string>();
   const summary = (pluginId: string): WebuiMiniAppSummary => ({
     pluginId,
@@ -126,13 +139,27 @@ function createFacade(): { readonly port: WebuiOperationPort; readonly calls: Fa
     async stopMiniApp(request: { pluginId: string }) {
       stopped.push(request.pluginId);
     },
+    async getSession(request: { id: string }) {
+      sessions.push(request.id);
+      const answer = sessionAnswers.get(request.id) ?? "live";
+      if (answer === "missing")
+        // The runtime's own shape for a session that is not there.
+        throw Object.assign(new Error(`session ${request.id} not found`), {
+          status: 404,
+          key: "SESSION_NOT_FOUND",
+        });
+      if (answer === "broken") throw new Error("harness unavailable");
+      return { session: { sessionId: request.id } };
+    },
   } as unknown as WebuiOperationPort;
   return {
     port,
     calls: {
       opened,
       stopped,
+      sessions,
       rotateCredential: (pluginId, credential) => credentials.set(pluginId, credential),
+      setSession: (sessionId, answer) => sessionAnswers.set(sessionId, answer),
     },
   };
 }
@@ -277,6 +304,7 @@ describe("a host without the Mini App capability", () => {
       ["listMiniApps", undefined],
       ["openMiniApp", { pluginId: VIEW_PLUGIN }],
       ["stopMiniApp", { pluginId: VIEW_PLUGIN }],
+      ["watchMiniAppPresentation", { pluginId: VIEW_PLUGIN, sessionId: "session-1" }],
     ];
     for (const [name, body] of cases) {
       const failure = await handle(name, body).catch((error: unknown) => error);
@@ -308,11 +336,15 @@ describe("listMiniApps", () => {
           pluginId: VIEW_PLUGIN,
           displayName: "Fixture Mini App",
           runtime: { kind: "process", status: "running" },
+          detached: false,
+          presentationRevision: 0,
         },
         {
           pluginId: REPLACE_PLUGIN,
           displayName: "Fixture Mini App",
           runtime: { kind: "process", status: "running" },
+          detached: false,
+          presentationRevision: 0,
         },
       ],
     });
@@ -554,5 +586,182 @@ describe("the runtime adapter behind the port", () => {
       );
       expect((failure as Error).message).toBe(MINIAPP_CAPABILITY_ABSENT);
     }
+  });
+});
+
+/**
+ * The standalone presentation lease over the wire.
+ *
+ * ADR 0020 ties the record to the standalone document's connection, so the two
+ * things to prove are that the stream holds it (and that the catalogue says so
+ * while it does) and that the stream ending is what releases it. The session half
+ * is the ticket's other criterion: an ended session is reported beside a page that
+ * keeps rendering, and a lookup that merely failed is a failure rather than an
+ * ended session.
+ */
+describe("watchMiniAppPresentation", () => {
+  // The scripted catalogue lists two plugins; a lease case needs one of them, so
+  // the row it reads back is a row the listing actually carries.
+  const LEASE_PLUGIN = VIEW_PLUGIN;
+  const SESSION = "session-lease";
+
+  interface LeaseStream {
+    readonly frames: AsyncIterator<WebuiMiniAppPresentationState>;
+  }
+
+  /**
+   * One handler set per case.
+   *
+   * Essential rather than tidy: the lease record lives in the handler closure, so
+   * a second set would answer the catalogue from a record the stream never wrote
+   * to — and the "detached reflects the live presentation" assertion would then
+   * pass or fail for the wrong reason.
+   */
+  function createLeaseHarness(port: WebuiOperationPort) {
+    const entries = createMiniAppHandlerEntries(port);
+    const handle = async (name: string, body: unknown): Promise<unknown> => {
+      const entry = entries.get(name);
+      if (!entry) throw new Error(`no Mini App handler for ${name}`);
+      const validated = entry.operation.validate(body);
+      if (!validated.ok) throw new Error(validated.message);
+      return bodyOf(await entry.handle({ requestId: `request-${name}` }, validated.body));
+    };
+    /** Invoke the stream operation the way the dispatcher does, and keep its source. */
+    const openLease = async (
+      body: { readonly pluginId: string; readonly sessionId: string },
+      signal?: AbortSignal,
+    ): Promise<LeaseStream> => {
+      const entry = entries.get(watchMiniAppPresentationOperation.name);
+      if (!entry) throw new Error("watchMiniAppPresentation is not registered");
+      const validated = entry.operation.validate(body);
+      if (!validated.ok) throw new Error(validated.message);
+      const result = await entry.handle(
+        { requestId: "lease", ...(signal ? { signal } : {}) },
+        validated.body,
+      );
+      if (!("stream" in result) || !result.stream.ok) throw new Error("expected a stream");
+      const source = result.stream.source as AsyncIterable<WebuiMiniAppPresentationState>;
+      return { frames: source[Symbol.asyncIterator]() };
+    };
+    return { handle, openLease };
+  }
+
+  it("registers the lease beside the other three, so it is not an unknown operation", () => {
+    const registry = createOperationRegistry({} as WebuiOperationPort);
+    expect(registry.has(watchMiniAppPresentationOperation.name)).toBe(true);
+  });
+
+  it("holds the lease while the stream is open, and the catalogue says so", async () => {
+    const { port, calls } = createFacade();
+    const { handle, openLease } = createLeaseHarness(port);
+    const controller = new AbortController();
+    const lease = await openLease(
+      { pluginId: LEASE_PLUGIN, sessionId: SESSION },
+      controller.signal,
+    );
+
+    const first = await lease.frames.next();
+    expect(first.done).toBe(false);
+    expect(first.value).toEqual({
+      pluginId: LEASE_PLUGIN,
+      sessionId: SESSION,
+      presentationRevision: 1,
+      session: "live",
+    });
+    expect(calls.sessions).toEqual([SESSION]);
+
+    // `detached` is the live record, not a constant: it is true now.
+    const listed = (await handle("listMiniApps", undefined)) as {
+      miniApps: ReadonlyArray<{ pluginId: string; detached: boolean; presentationRevision: number }>;
+    };
+    const row = listed.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN);
+    expect(row).toMatchObject({ detached: true, presentationRevision: 1 });
+
+    // A second frame never arrives on its own: the stream is the lease, not a feed.
+    const parked = await Promise.race([
+      lease.frames.next().then(() => "settled" as const),
+      new Promise<"parked">((resolve) => setTimeout(() => resolve("parked"), 20)),
+    ]);
+    expect(parked).toBe("parked");
+
+    // The connection going away is the release.
+    controller.abort();
+    await lease.frames.next().catch(() => undefined);
+    const afterClose = (await handle("listMiniApps", undefined)) as {
+      miniApps: ReadonlyArray<{ pluginId: string; detached: boolean; presentationRevision: number }>;
+    };
+    expect(afterClose.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN)).toMatchObject(
+      // The revision stays where it was: it counts acquisitions, it is not a flag.
+      { detached: false, presentationRevision: 1 },
+    );
+  });
+
+  it("moves the revision on each acquisition the inline view can read", async () => {
+    const { port } = createFacade();
+    const { handle, openLease } = createLeaseHarness(port);
+    const first = new AbortController();
+    const reopened = await openLease(
+      { pluginId: LEASE_PLUGIN, sessionId: SESSION },
+      first.signal,
+    );
+    expect((await reopened.frames.next()).value).toMatchObject({ presentationRevision: 1 });
+    first.abort();
+    await reopened.frames.next().catch(() => undefined);
+
+    const second = new AbortController();
+    const again = await openLease(
+      { pluginId: LEASE_PLUGIN, sessionId: SESSION },
+      second.signal,
+    );
+    expect((await again.frames.next()).value).toMatchObject({ presentationRevision: 2 });
+
+    const listed = (await handle("listMiniApps", undefined)) as {
+      miniApps: ReadonlyArray<{ pluginId: string; detached: boolean; presentationRevision: number }>;
+    };
+    expect(listed.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN)).toMatchObject({
+      detached: true,
+      presentationRevision: 2,
+    });
+    second.abort();
+    await again.frames.next().catch(() => undefined);
+  });
+
+  it("reports a session the runtime no longer has, and keeps the page's lease", async () => {
+    const { port, calls } = createFacade();
+    const { openLease } = createLeaseHarness(port);
+    calls.setSession(SESSION, "missing");
+    const controller = new AbortController();
+    const lease = await openLease({ pluginId: LEASE_PLUGIN, sessionId: SESSION }, controller.signal);
+
+    const frame = await lease.frames.next();
+    // Reported, not enforced: the Mini App is plugin-scoped, so the lease is taken
+    // exactly as it would be for a live session and the view keeps rendering.
+    expect(frame.value).toMatchObject({ session: "ended", presentationRevision: 1 });
+
+    controller.abort();
+    await lease.frames.next().catch(() => undefined);
+  });
+
+  it("fails on a lookup that is not a confirmed absence, and takes no lease", async () => {
+    const { port, calls } = createFacade();
+    const { handle, openLease } = createLeaseHarness(port);
+    calls.setSession(SESSION, "broken");
+
+    const failure = await openLease({
+      pluginId: LEASE_PLUGIN,
+      sessionId: SESSION,
+    }).catch((error: unknown) => error);
+
+    // The failure surfaces: an unreachable runtime is not an ended session, and
+    // nothing may report the person's session as gone because of it.
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe("harness unavailable");
+    const listed = (await handle("listMiniApps", undefined)) as {
+      miniApps: ReadonlyArray<{ pluginId: string; detached: boolean; presentationRevision: number }>;
+    };
+    expect(listed.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN)).toMatchObject({
+      detached: false,
+      presentationRevision: 0,
+    });
   });
 });

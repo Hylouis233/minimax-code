@@ -15,6 +15,7 @@
 
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
+import type { WebuiMiniAppPresentationState } from "../../shared/contracts/miniapp.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
@@ -162,8 +163,33 @@ export interface WebuiWire {
     requestBody: { readonly surface: WebuiBrowserSurface },
     onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
   ): () => void;
+  /**
+   * The standalone presentation lease (ADR 0020).
+   *
+   * A watch rather than a request because the lease's lifetime *is* the socket's:
+   * the service releases the record when this connection closes, which is what
+   * makes a standalone tab's presentation end when the tab does. The returned
+   * function is the release.
+   */
+  watchMiniAppPresentation(
+    operation: string,
+    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
   /** The one HTTP route, built from the same base and token as the socket. */
   workspaceFileUrl(input: { readonly workspaceDir: string; readonly path: string }): string;
+  /**
+   * The standalone Mini App's page, built from the same base and token.
+   *
+   * The page route is admitted like every other document — the service checks the
+   * token on an `index.html` read — so the link carries it. The plugin and the
+   * session ride the query because they are the deep link's whole content.
+   */
+  miniappStandaloneUrl(input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): string;
   /**
    * The process-event socket. It belongs to the wire rather than to the table
    * because it is a long-lived socket with its own reconnect policy, not a
@@ -515,6 +541,65 @@ export function createWebuiWire({
     };
   }
 
+  /**
+   * The standalone presentation lease: one frame, then the socket stays open.
+   *
+   * The same shape as the terminal and browser watches, and for the same reason —
+   * a stop must not deliver, and `close()` is not a promise that the socket stops
+   * emitting. What differs is what the open socket *means*: the service holds the
+   * lease while it lives, so closing this watch is the release.
+   */
+  function watchMiniAppPresentation(
+    operation: string,
+    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    const session = openWireSession(operation, requestBody, {
+      frame: (session, frame) => {
+        if (stopped) return;
+        if (frame.kind === "error") {
+          // A refusal is a failure, not an absent lease: the service could not
+          // establish the presentation, and saying "no lease" would let the
+          // caller read a broken host as a closed tab. The socket is closed with
+          // it, because nothing is being held on the other end.
+          stopped = true;
+          session.close();
+          onFailure?.(
+            new WebuiWireError(
+              frame.code,
+              frame.message ?? `${operation} refused`,
+              frame.requestId,
+            ),
+          );
+          return;
+        }
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        onFrame(frame.body as WebuiMiniAppPresentationState);
+      },
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
+  function miniappStandaloneUrl({
+    pluginId,
+    sessionId,
+  }: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): string {
+    // Same base rule as `workspaceFileUrl`: the socket URL carries the token, the
+    // page route checks it, and `ws:`/`wss:` share a prefix so one substitution
+    // reaches `http:`/`https:`.
+    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const query = new URLSearchParams({ token, plugin: pluginId, session: sessionId });
+    return `${base}/miniapp?${query.toString()}`;
+  }
+
   function workspaceFileUrl({
     workspaceDir,
     path: filePath,
@@ -536,7 +621,9 @@ export function createWebuiWire({
     watchTerminal,
     watchBrowserFrames,
     watchBrowserWebTabs,
+    watchMiniAppPresentation,
     workspaceFileUrl,
+    miniappStandaloneUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
   };
 }

@@ -34,26 +34,31 @@ import {
   webuiMiniAppRefusalText,
   webuiMiniAppRows,
 } from "../../src/client/features/miniapp/projection/miniapp-view.js";
-import type { WebuiMiniAppSummary } from "../../src/shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppCatalogueRow,
+  WebuiMiniAppSummary,
+} from "../../src/shared/contracts/miniapp.js";
 
 const SESSION = "session-1";
 
 function miniApp(
   pluginId: string,
   status: WebuiMiniAppSummary["runtime"]["status"],
-  extra: Partial<WebuiMiniAppSummary> = {},
-): WebuiMiniAppSummary {
+  extra: Partial<WebuiMiniAppSummary & { detached: boolean; presentationRevision: number }> = {},
+): WebuiMiniAppCatalogueRow {
   return {
     pluginId,
     displayName: `${pluginId} name`,
     runtime: { kind: "process", status },
+    detached: false,
+    presentationRevision: 0,
     ...extra,
   };
 }
 
 /** A port whose answers each case scripts. Counts the calls it received. */
 function scriptedPort(input: {
-  readonly miniApps: readonly WebuiMiniAppSummary[];
+  readonly miniApps: readonly WebuiMiniAppCatalogueRow[];
   readonly open: (pluginId: string) => Promise<{ pluginId: string; viewUrl: string }>;
   readonly stop?: (pluginId: string) => Promise<void>;
 }): WebuiMiniAppPortSlice & {

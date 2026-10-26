@@ -481,6 +481,8 @@
       "packages/webui/test/unit/workspace-write-fence.test.ts",
       "packages/webui/test/unit/miniapp-client-state.test.ts",
       "packages/webui/test/unit/miniapp-bridge.test.ts",
+      "packages/webui/test/unit/miniapp-presentation-lease.test.ts",
+      "packages/webui/test/unit/miniapp-standalone-route.test.ts",
       "packages/webui/test/unit/miniapp-surfaces.test.tsx"
     ]
   }

@@ -9,8 +9,8 @@
 // so the decision lives here rather than being re-derived in two components.
 
 import type {
+  WebuiMiniAppCatalogueRow,
   WebuiMiniAppRuntimeStatus,
-  WebuiMiniAppSummary,
 } from "../../../../shared/contracts/miniapp.js";
 
 /**
@@ -43,6 +43,15 @@ export interface WebuiMiniAppRow {
    * fails.
    */
   readonly enabled: boolean;
+  /**
+   * True while a standalone presentation of this Mini App is live (ADR 0020).
+   *
+   * The inline view reports it and offers to switch; it does not start a second
+   * presentation of the same app while this is true.
+   */
+  readonly detached: boolean;
+  /** How many times a standalone presentation has been acquired. Moves on each. */
+  readonly presentationRevision: number;
 }
 
 /** The state in words. A closed union in, a label out — never "unknown". */
@@ -63,7 +72,7 @@ export function webuiMiniAppStatusLabel(status: WebuiMiniAppRuntimeStatus): stri
 
 /** One catalogue answer, as the surfaces render it. */
 export function webuiMiniAppRows(
-  miniApps: readonly WebuiMiniAppSummary[],
+  miniApps: readonly WebuiMiniAppCatalogueRow[],
 ): readonly WebuiMiniAppRow[] {
   return miniApps.map((miniApp) => {
     // A disabled package has no runtime state to report: it is installed and not
@@ -79,8 +88,24 @@ export function webuiMiniAppRows(
       statusLabel: enabled ? webuiMiniAppStatusLabel(miniApp.runtime.status) : "已停用",
       running: enabled && miniApp.runtime.status === "running",
       enabled,
+      detached: miniApp.detached,
+      presentationRevision: miniApp.presentationRevision,
     };
   });
+}
+
+/**
+ * The browsing-context name a Mini App's standalone tab claims.
+ *
+ * `window.open` with a name either creates that context or focuses the one that
+ * already has it, so this is the whole mechanism behind "switch to the tab
+ * instead of opening a second document": the standalone surface sets its
+ * `window.name` to this on mount, and the inline view opens or focuses the same
+ * name. Deterministic from the plugin id because the two documents share nothing
+ * but the service and this convention.
+ */
+export function webuiMiniAppWindowName(pluginId: string): string {
+  return `webui-miniapp:${pluginId}`;
 }
 
 /** The rows that are up, in catalogue order. */
