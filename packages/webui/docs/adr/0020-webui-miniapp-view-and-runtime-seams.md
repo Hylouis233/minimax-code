@@ -405,6 +405,14 @@ different one. The owner is whatever starts the runtime first, recorded in the s
 with a liveness proof that the operating system releases when the owner dies, rather than a timestamp
 alone — a stale record must be reclaimable, and a live one must not be taken by mistake.
 
+That proof is an exclusively bound endpoint per Mini App, in its own plugin data directory: a socket
+file on POSIX and a named pipe on Windows, named from the plugin id the way the OAuth lease endpoint is
+named from its data directory (`packages/oauth-lease-protocol/src/endpoints.ts`). Binding is the
+ownership: a second bind fails while the owner lives, the operating system releases it when the owner
+dies, and the record beside it states which client holds it and since when. The endpoint is never
+unlinked before binding — unlinking first would steal a live owner's endpoint, which is the mistake the
+OAuth lease server is entitled to make with its own path and this record is not.
+
 The shipped desktop client writes no such record, so the record cannot be the only signal. For anything
 already running, including that client, the signal is the Mini App's own port: the client probes the
 derived port before starting, and a listener that answers an unauthenticated request the way the guard
