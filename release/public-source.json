@@ -1667,6 +1667,7 @@
     "packages/local-runtime-v2/test/unit/miniapp/loopback-guard.test.ts",
     "packages/local-runtime-v2/test/unit/miniapp/node-runtime-credential.test.ts",
     "packages/local-runtime-v2/test/unit/miniapp/owner-lease.test.ts",
+    "packages/local-runtime-v2/test/unit/miniapp/runtime-miniapp-options.test.ts",
     "packages/local-runtime-v2/test/unit/plugin-system/miniapp-manifest.test.ts",
     "packages/local-runtime/assets/prompts/code-review/review-candidates.md",
     "packages/local-runtime/assets/prompts/code-review/reviewer-system.md",

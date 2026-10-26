@@ -27,13 +27,16 @@ export interface RuntimeMiniAppServiceOptions {
 }
 
 export function resolveRuntimeMiniAppOptions(
-  input: RuntimeMiniAppServiceOptions & { readonly runtimeOwnerKind?: string },
+  input: RuntimeMiniAppServiceOptions & {
+    readonly runtimeOwnerKind?: string;
+    /** The runtime owner policy's `wiring.miniAppService` cell for this host. */
+    readonly miniAppService?: boolean;
+  },
 ): RuntimeMiniAppOptions | undefined {
-  if (input.runtimeOwnerKind !== undefined && input.runtimeOwnerKind !== 'electron') {
-    return undefined;
-  }
+  // Explicit options stay reachable: a caller that constructs the runtime with them has asked for the
+  // service by name, including the case with no declared owner kind.
   if (input.miniApp) return input.miniApp;
-  return input.runtimeOwnerKind === 'electron' ? {} : undefined;
+  return input.miniAppService === true ? {} : undefined;
 }
 
 export function createDeferredRuntimeOwnersLifecycle(): {

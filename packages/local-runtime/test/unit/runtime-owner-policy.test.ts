@@ -143,6 +143,7 @@ describe('resolveRuntimeOwnerPolicy', () => {
         'browserActivation',
         'channelService',
         'cronService',
+        'miniAppService',
         'ownsV2Runtime',
         'schedulerHost',
       ]);

@@ -480,7 +480,11 @@ export async function createRuntimeServices(
     ),
     inspector,
     internalTurnPromptReads,
-    miniappAvailable: resolveRuntimeMiniAppOptions(options) !== undefined,
+    miniappAvailable:
+      resolveRuntimeMiniAppOptions({
+        ...options,
+        miniAppService: options.ownerPolicy?.wiring.miniAppService,
+      }) !== undefined,
     browserUse: browserUseComposition.service,
     promptSnapshots,
     globalInstructions,
@@ -699,7 +703,10 @@ async function initializeRuntimeServiceOwners(
     );
     bindTaskAgentBindingCapture(input, { plugin, mcp }, pluginLogger);
     miniAppComposition = await composeMiniAppRuntimeCapability({
-      options: resolveRuntimeMiniAppOptions(input.options),
+      options: resolveRuntimeMiniAppOptions({
+        ...input.options,
+        miniAppService: input.options.ownerPolicy?.wiring.miniAppService,
+      }),
       db: input.options.db,
       dataDir: input.options.dataDir,
       nowMs: input.nowMs,

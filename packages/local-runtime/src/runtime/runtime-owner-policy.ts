@@ -58,6 +58,12 @@ export interface RuntimeWiring {
   readonly ownsV2Runtime: boolean;
   /** Replaces the inline `runtimeOwnerKind === 'electron'` scheduler gate. */
   readonly schedulerHost: boolean;
+  /**
+   * Whether this host runs the Mini App service. A literal per row on purpose: the electron-capability
+   * predicate answers true for an owner that declared no kind, and a service enabled for an absent owner
+   * is a behaviour change no client asked for.
+   */
+  readonly miniAppService: boolean;
   /** Replaces `ownsElectronRuntimeCapabilities` at the `services.ts` cron gate. */
   readonly cronService: boolean;
   /**
@@ -200,6 +206,7 @@ const UNKNOWN_OWNER_POLICY: Omit<RuntimeOwnerPolicy, 'kind'> = {
   wiring: {
     ownsV2Runtime: true,
     schedulerHost: false,
+    miniAppService: false,
     cronService: false,
     channelService: false,
     browserActivation: 'explicit-config',
@@ -254,6 +261,7 @@ export function resolveRuntimeOwnerPolicy(
         wiring: {
           ownsV2Runtime: isV2RuntimeOwner(kind, electronHost, cliEmbedded),
           schedulerHost: true,
+          miniAppService: true,
           cronService: ownsElectronRuntimeCapabilities(kind),
           channelService:
             ownsElectronRuntimeCapabilities(kind) && capabilityProfile !== 'cli',
@@ -279,6 +287,7 @@ export function resolveRuntimeOwnerPolicy(
         wiring: {
           ownsV2Runtime: isV2RuntimeOwner(kind, electronHost, cliEmbedded),
           schedulerHost: false,
+          miniAppService: false,
           cronService: ownsElectronRuntimeCapabilities(kind),
           channelService:
             ownsElectronRuntimeCapabilities(kind) && capabilityProfile !== 'cli',
@@ -307,6 +316,7 @@ export function resolveRuntimeOwnerPolicy(
         wiring: {
           ownsV2Runtime: isV2RuntimeOwner(kind, electronHost, cliEmbedded),
           schedulerHost: false,
+          miniAppService: false,
           cronService: ownsElectronRuntimeCapabilities(kind),
           channelService:
             ownsElectronRuntimeCapabilities(kind) && capabilityProfile !== 'cli',
@@ -332,6 +342,8 @@ export function resolveRuntimeOwnerPolicy(
           // The raw option is undefined, so the compatibility gate rejects it.
           ownsV2Runtime: isV2RuntimeOwner(kind, electronHost, cliEmbedded),
           schedulerHost: false,
+          // A literal, not the predicate below: an absent owner must not inherit the service.
+          miniAppService: false,
           // ...while these read the raw undefined and answer true.
           cronService: ownsElectronRuntimeCapabilities(kind),
           channelService:
@@ -364,6 +376,9 @@ export function resolveRuntimeOwnerPolicy(
           // layer and with it the questionnaire service.
           ownsV2Runtime: isV2RuntimeOwner('tui', electronHost, cliEmbedded),
           schedulerHost: true,
+          // Stays false until the presenter and the view land with it: a cell flipped on its own
+          // leaves the agent able to start a Mini App that nothing can display.
+          miniAppService: false,
           cronService: true,
           channelService: false,
           browserActivation: 'explicit-config',
