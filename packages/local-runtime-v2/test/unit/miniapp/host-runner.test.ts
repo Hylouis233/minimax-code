@@ -338,21 +338,23 @@ describe('Mini App child host runner', () => {
 
 /** The child harness is TypeScript here, so the real child runs it through the repo's tsx. */
 function tsxCli(): string {
-  return path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  return fileURLToPath(new URL('../../../../../node_modules/tsx/dist/cli.mjs', import.meta.url));
 }
 
 /** Workspace `@mavis/*` imports resolve through the standalone path map, not built `dist`. */
 function standaloneTsconfig(): string {
-  return path.join(process.cwd(), 'tsconfig.standalone.json');
+  return fileURLToPath(new URL('../../../../../tsconfig.standalone.json', import.meta.url));
 }
 
 function runnerHarness(): string {
   return fileURLToPath(
-    new URL('../helpers/miniapp-host-runner-child.ts', import.meta.url),
+    new URL('../../helpers/miniapp-host-runner-child.ts', import.meta.url),
   );
 }
 
 describe('Mini App child host runner process exit', () => {
+  // A real child under tsx compiles the runtime graph before it can answer, so this case needs a
+  // budget larger than the default one; the assertions themselves stay the shipped ones.
   it('naturally exits a Connector-enabled real child after stopped is flushed', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'miniapp-runner-connector-exit-'));
     const packageRoot = path.join(root, 'package');
@@ -365,6 +367,7 @@ describe('Mini App child host runner process exit', () => {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     });
+    child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(`[child] ${chunk}`));
     const originalKill = child.kill.bind(child);
     const hostTermination = vi.spyOn(child, 'kill');
 
@@ -384,7 +387,7 @@ describe('Mini App child host runner process exit', () => {
       });
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 
   it('naturally exits a real child after stopped is flushed without Host termination', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'miniapp-runner-exit-'));
@@ -398,6 +401,7 @@ describe('Mini App child host runner process exit', () => {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });
+    child.stderr?.on('data', (chunk: Buffer) => process.stderr.write(`[child] ${chunk}`));
     const originalKill = child.kill.bind(child);
     const hostTermination = vi.spyOn(child, 'kill');
 
@@ -422,7 +426,7 @@ describe('Mini App child host runner process exit', () => {
       });
       await rm(root, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
 
 describe('Mini App child host runner diagnostics', () => {
