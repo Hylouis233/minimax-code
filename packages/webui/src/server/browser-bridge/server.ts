@@ -192,6 +192,14 @@ interface BridgeSurfaceState {
   readonly targets: Map<string, WebuiBrowserBridgeTarget>;
   /** One listener set per tab being streamed. */
   readonly frameListeners: Map<string, Set<(frame: WebuiBrowserImageFrame) => void>>;
+  /**
+   * The tab the extension is currently streaming pictures of.
+   *
+   * The extension captures the tab the person is looking at, and it names the
+   * tab in every picture it sends. So the last picture's target is the tab in
+   * front — the one tab a picture can be taken of.
+   */
+  visibleTargetId: string | undefined;
   readonly targetChangeListeners: Set<
     (change: { readonly targetId: string; readonly generation: number }) => void
   >;
@@ -466,6 +474,7 @@ async readInstallationKey(
       live: false,
       targets: new Map(),
       frameListeners: new Map(),
+      visibleTargetId: undefined,
       targetChangeListeners: new Set(),
       coreSessions: new Map(),
     };
@@ -602,6 +611,11 @@ async readInstallationKey(
   }
 
   #onFrame(state: BridgeSurfaceState, image: WebuiBrowserBridgeImageFrame): void {
+    // The picture names the tab it was taken of, and the extension takes
+    // pictures of the tab the person is looking at. So this is the tab in
+    // front, whether or not anybody here is listening for it — and it is what
+    // a screenshot of this surface can be taken of.
+    state.visibleTargetId = image.targetId;
     const listeners = state.frameListeners.get(image.targetId);
     if (!listeners || listeners.size === 0) return;
     // The frame keeps the generation it carries. It is NOT relabelled with the
@@ -895,9 +909,75 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
             this.#state.targets.get(target.targetId)?.generation ?? target.generation,
         },
       ),
+      {
+        // The screenshot is the one action the extension cannot take through
+        // the debugger, and it does not need to: the extension is already
+        // streaming pictures of the tab the person is looking at, and a
+        // picture of that tab is exactly what a screenshot of this page is.
+        //
+        // The seam is what keeps the boundary intact. `Page.captureScreenshot`
+        // would capture *any* tab on demand, including the ones the person is
+        // not looking at; the stream captures only the one in front. So the
+        // screenshot of a tab that is not in front is refused rather than
+        // answered with some other tab's picture.
+        captureScreenshot: async (_input, context) =>
+          await this.#captureVisibleFrame(target.targetId, context.timeoutMs),
+      },
     );
     this.#state.coreSessions.set(target.targetId, session);
     return session;
+  }
+
+  /**
+   * The next picture the extension sends of a tab.
+   *
+   * The extension streams pictures of the tab in front; one of them is the
+   * picture of this tab, if this tab is the one in front. A tab that is not in
+   * front produces no picture at all, and the wait ends without one — which
+   * is the honest answer, since the only alternative is somebody else's page.
+   */
+  async #captureVisibleFrame(
+    targetId: string,
+    timeoutMs: number,
+  ): Promise<Record<string, unknown>> {
+    const state = this.#state;
+    const listeners = state.frameListeners.get(targetId) ?? new Set();
+    const frame = await new Promise<WebuiBrowserImageFrame | undefined>((resolve) => {
+      let settled = false;
+      const finish = (picture: WebuiBrowserImageFrame | undefined): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        clearInterval(watch);
+        listeners.delete(listener);
+        resolve(picture);
+      };
+      const listener = (picture: WebuiBrowserImageFrame): void => finish(picture);
+      const timer = setTimeout(() => finish(undefined), Math.max(1, timeoutMs));
+      // A picture of another tab means this tab is not the one in front, and no
+      // picture of it is coming. The wait ends at once rather than running out
+      // the whole budget on something that cannot happen.
+      const watch = setInterval(() => {
+        const visible = state.visibleTargetId;
+        if (visible !== undefined && visible !== targetId) finish(undefined);
+      }, 20);
+      listeners.add(listener);
+      state.frameListeners.set(targetId, listeners);
+    });
+    if (!frame) {
+      throw new WebuiBridgeOperationError(
+        "browser_capability_denied",
+        `The ${this.surface} surface can only picture the tab that is in front, and this tab is not the one being looked at.`,
+      );
+    }
+    return {
+      success: true,
+      format: frame.format === "jpeg" ? "jpeg" : "png",
+      data: frame.data,
+      bytes: Math.floor((frame.data.length * 3) / 4),
+      ...(frameWidth(frame) ? { width: frameWidth(frame) } : {}),
+      ...(frameHeight(frame) ? { height: frameHeight(frame) } : {}),
+    };
   }
 
   /**
@@ -979,6 +1059,41 @@ class BridgeProvider implements WebuiBridgeSurfaceProvider {
    * the panel may still be watching.
    */
   async close(): Promise<void> {}
+}
+
+/**
+ * The width of a PNG picture, in pixels.
+ *
+ * A PNG's dimensions live in the IHDR chunk, which starts eight bytes into the
+ * file: four bytes of signature, four of chunk length and type, then the
+ * width. The picture the extension sends is base64, so it is decoded first.
+ *
+ * A picture that is not a PNG — the extension can send JPEG — has no width
+ * this can read, and the answer is left out rather than guessed.
+ */
+function frameWidth(frame: WebuiBrowserImageFrame): number | undefined {
+  return pngDimension(frame, 16);
+}
+
+/** The height of a PNG picture, in pixels. */
+function frameHeight(frame: WebuiBrowserImageFrame): number | undefined {
+  return pngDimension(frame, 20);
+}
+
+/** One dimension of a PNG picture, read from its header. */
+function pngDimension(frame: WebuiBrowserImageFrame, offset: number): number | undefined {
+  if (frame.format !== "png") return undefined;
+  let bytes: Buffer;
+  try {
+    bytes = Buffer.from(frame.data, "base64");
+  } catch {
+    return undefined;
+  }
+  if (bytes.length < offset + 4) return undefined;
+  if (!bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return undefined;
+  }
+  return bytes.readUInt32BE(offset);
 }
 
 /**

@@ -47,18 +47,22 @@
 //     frame's own session cannot be routed and is refused.
 //
 // The surface is not the isolated Chromium, and it cannot do everything the
-// isolated Chromium can. Two actions are outside it:
+// isolated Chromium can. One action is outside it:
 //
-//   - `screenshot` needs `Page.captureScreenshot`, which the extension
-//     deliberately does not run: it could capture a tab the person is not
-//     looking at. The extension's own image stream is how the panel shows a
-//     tab, and it can only capture the tab in front.
 //   - `upload_files` needs a file chooser the extension does not intercept.
 //
-// Both are refused by name when they are asked for — the extension answers
-// that it does not support the DevTools command — rather than approximated. A
-// screenshot of the wrong tab, or a file that went somewhere else, would be
-// worse than a refusal that says which capability is missing.
+// It is refused by name when it is asked for rather than approximated: a file
+// that went somewhere else would be worse than a refusal that says which
+// capability is missing.
+//
+// The screenshot is a different case, and it works. The extension streams
+// pictures of the tab the person is looking at, and a picture of that tab is
+// what a screenshot of the page is — so the session takes its pictures from
+// there rather than from a DevTools command. What that keeps out of reach is
+// the rest of the browser: a DevTools screenshot could capture any tab, and
+// the stream cannot. A tab that is not the one in front therefore has no
+// picture to give, and the screenshot of it is refused rather than answered
+// with somebody else's page.
 
 import type {
   BrowserAttachedFrame,

@@ -222,6 +222,34 @@ function announceTarget(client: BridgeClient, generation: number, url = "https:/
 }
 
 /**
+ * A one-pixel PNG, as base64.
+ *
+ * The extension streams pictures of the tab in front, and the screenshot the
+ * browser tools take on that surface is one of those pictures. A real PNG is
+ * used rather than an opaque string because the picture's dimensions are read
+ * from its header.
+ */
+const ONE_PIXEL_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+/** Sends one picture of a tab, the way the extension streams them. */
+function sendFrame(client: BridgeClient, targetId: string, generation: number): void {
+  client.socket.send(
+    JSON.stringify({
+      kind: "frame",
+      frame: {
+        browserId: BROWSER_ID,
+        targetId,
+        generation,
+        data: ONE_PIXEL_PNG,
+        format: "png",
+        sequence: 1,
+      },
+    }),
+  );
+}
+
+/**
  * Answers the DevTools commands the core sends, with the shapes it reads.
  *
  * The answer is a stand-in for the browser: it does not run a page, it says
@@ -521,6 +549,77 @@ describe("WebUI browser bridge — the Agent's browser tools over Browser Core",
     expect(clicked).toBeDefined();
     // The click reached the browser as a pointer event at the element's box.
     expect(seenMethods.has("Input.dispatchMouseEvent")).toBe(true);
+    client.socket.terminate();
+  });
+
+  it("answers a screenshot with the picture the extension streams", { timeout: CASE_BUDGET_MS }, async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge");
+    expect(provider).toBeDefined();
+    announceTarget(client, 4);
+    await settle();
+
+    const seen = client.frames.length;
+    const seenMethods = new Set<string>();
+    answerCoreCommands(client, seen, seenMethods);
+
+    // The extension streams pictures of the tab in front, continuously. The
+    // screenshot takes the next one that arrives, so the test streams too
+    // rather than guessing when the picture would be sent.
+    const pending = provider!.sendCommand(
+      { targetId: TARGET_ID, generation: 4 },
+      "screenshot",
+      {},
+    );
+    const streamer = setInterval(() => sendFrame(client, TARGET_ID, 4), 50);
+    const answer = (await pending) as {
+      success?: boolean;
+      format?: string;
+      data?: string;
+      width?: number;
+      height?: number;
+    };
+    clearInterval(streamer);
+
+    // The picture comes back the way the browser tools expect it: the image
+    // itself, its format, and its dimensions read from the picture's header.
+    expect(answer.success).toBe(true);
+    expect(answer.format).toBe("png");
+    expect(answer.data).toBe(ONE_PIXEL_PNG);
+    expect(answer.width).toBe(1);
+    expect(answer.height).toBe(1);
+    client.socket.terminate();
+  });
+
+  it("refuses a screenshot of a tab that is not the one in front", { timeout: CASE_BUDGET_MS }, async () => {
+    const harness = await startHarness();
+    const client = await pairEdge(harness);
+    const provider = harness.bridge.createProvider("edge");
+    expect(provider).toBeDefined();
+    announceTarget(client, 4);
+    await settle();
+
+    const seen = client.frames.length;
+    const seenMethods = new Set<string>();
+    answerCoreCommands(client, seen, seenMethods);
+
+    // The person is looking at another tab, and the extension is streaming
+    // pictures of that one. The tab the Agent is driving is not the one in
+    // front, so there is no picture of it to give.
+    sendFrame(client, "tab-other", 1);
+
+    const outcome = await provider!.sendCommand(
+      { targetId: TARGET_ID, generation: 4 },
+      "screenshot",
+      {},
+    ).catch((error: unknown) => error);
+    // The refusal is immediate and it names the reason. It does not answer
+    // with the picture of the tab that happens to be in front — that would be
+    // somebody else's page, and a screenshot of the wrong page is worse than
+    // no screenshot.
+    expect(outcome).toMatchObject({ code: "browser_capability_denied" });
+    expect(String((outcome as Error)?.message ?? outcome)).toMatch(/in front/u);
     client.socket.terminate();
   });
 });
