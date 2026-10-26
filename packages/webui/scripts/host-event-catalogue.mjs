@@ -7,6 +7,15 @@ const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const hostRoot = path.resolve(packageRoot, "../local-runtime-v2/src");
 const output = path.join(packageRoot, "src/shared/contracts/host-event-types.generated.ts");
 const eventName = /^(?:session|message|agent|rotation|content|turn|stream|permission|questionnaire)\.[a-z_.]+$/u;
+/**
+ * The Mini App agent module declares and emits its own run-event vocabulary
+ * (`turn.started`, `message.committed`, `permission.requested`, ...). Those events are
+ * projected to the Mini App page bridge, never written to the host event bus, so a name
+ * shared with a host event does not make one. Excluded by directory rather than by
+ * dropping names, so the catalogue keeps reporting real host producers only.
+ */
+const excludedDirectories = [path.join("service", "miniapp", "agent")];
+
 
 /** Collect actual literal declarations with the TypeScript parser, including typed producers. */
 export function collectHostEventTypes(root = hostRoot, read = readFileSync) {
@@ -15,7 +24,12 @@ export function collectHostEventTypes(root = hostRoot, read = readFileSync) {
   function walk(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const filename = path.join(directory, entry.name);
-      if (entry.isDirectory()) { walk(filename); continue; }
+      if (entry.isDirectory()) {
+        const relative = path.relative(root, filename);
+        if (excludedDirectories.some((suffix) => relative === suffix || relative.endsWith(path.sep + suffix))) continue;
+        walk(filename);
+        continue;
+      }
       if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) continue;
       files.push(filename);
     }
