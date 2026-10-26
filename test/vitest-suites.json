@@ -472,6 +472,7 @@
       "packages/webui/test/unit/browser-bridge-cdp.test.ts",
       "packages/webui/test/unit/browser-bridge-adversarial.test.ts",
       "packages/webui/test/unit/browser-bridge-credential-secrecy.test.ts",
+      "packages/webui/test/unit/miniapp-proxy.test.ts",
       "packages/webui/test/unit/workspace-write-fence.test.ts"
     ]
   }
