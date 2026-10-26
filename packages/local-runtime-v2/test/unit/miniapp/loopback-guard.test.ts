@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { createServer as createNetServer, connect as connectNet } from 'node:net';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -10,6 +11,7 @@ import {
   MINIAPP_LOOPBACK_HEALTH_PATH,
   MINIAPP_LOOPBACK_TOKEN_HEADER,
 } from '../../../src/service/miniapp/contracts.js';
+import { waitForLoopbackReadiness } from '../../../src/service/miniapp/process/node-runtime/loopback-readiness.js';
 import {
   isMiniAppRunnerInitMessage,
   startMiniAppModule,
@@ -255,5 +257,65 @@ describe('runner init message', () => {
     expect(isMiniAppRunnerInitMessage({ ...initMessage(), loopbackToken: '' })).toBe(false);
     expect(isMiniAppRunnerInitMessage({ ...initMessage(), loopbackToken: 42 })).toBe(false);
     expect(isMiniAppRunnerInitMessage({ ...initMessage(), loopbackToken: ['token'] })).toBe(false);
+  });
+});
+
+describe('Mini App loopback readiness', () => {
+  function readiness(port: number, token: string, timeoutMs = 2_000) {
+    return waitForLoopbackReadiness({
+      port,
+      token,
+      deadline: Date.now() + timeoutMs,
+      nowMs: Date.now,
+      probeTimeoutMs: 500,
+      retryMs: 25,
+      wait: (ms, signal) =>
+        new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(resolve, ms);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+          });
+        }),
+      signal: new AbortController().signal,
+    });
+  }
+
+  it('passes when the guard rejects the anonymous probe and answers the credentialed one', async () => {
+    await expect(readiness(port, TOKEN)).resolves.toBeUndefined();
+  });
+
+  it('fails when the credentialed probe is rejected', async () => {
+    await expect(readiness(port, 'wrong-credential')).rejects.toMatchObject({
+      code: 'READINESS_PROBE_REJECTED',
+      message: 'authenticated health probe expected 204, received 401',
+    });
+  });
+
+  it('fails when an anonymous probe is not rejected', async () => {
+    const plainPort = await freePort();
+    const script = [
+      "const http = require('node:http');",
+      'http',
+      '  .createServer((_request, response) => response.writeHead(200).end())',
+      `  .listen(${plainPort}, '127.0.0.1');`,
+    ].join('\n');
+    const child = spawn(process.execPath, ['-e', script], { stdio: 'ignore' });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await expect(readiness(plainPort, TOKEN)).rejects.toMatchObject({
+        code: 'READINESS_PROBE_REJECTED',
+        message: 'unauthenticated health probe expected 401, received 200',
+      });
+    } finally {
+      child.kill('SIGKILL');
+    }
+  });
+
+  it('times out when nothing is listening', async () => {
+    const closedPort = await freePort();
+    await expect(readiness(closedPort, TOKEN, 150)).rejects.toMatchObject({
+      code: 'READINESS_TIMEOUT',
+    });
   });
 });
