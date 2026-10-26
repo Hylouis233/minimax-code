@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { lstat, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
+import { request as httpRequest } from 'node:http';
 import { createConnection } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import type {
   MiniAppRuntimeExit,
   ProcessMiniAppCandidate,
 } from '../../contracts.js';
+import { MINIAPP_LOOPBACK_HEALTH_PATH, MINIAPP_LOOPBACK_TOKEN_HEADER } from '../../contracts.js';
 import { selectFailureAfterCleanup } from '../../supervisor/cleanup-settlement.js';
 import { MiniAppCleanupUnprovenError, markMiniAppRootTerminationProven } from '../../errors.js';
 import { sanitizeMiniAppRuntimeLogEvent } from '../../runtime-log.js';
@@ -83,6 +85,7 @@ interface NodeRuntimeOptions {
   readonly ensureDirectory?: (directory: string) => Promise<void>;
   readonly resolveRealPath?: (target: string) => Promise<string>;
   readonly makeStartupToken?: () => string;
+  readonly makeLoopbackToken?: () => string;
   readonly nowMs?: () => number;
   readonly wait?: (ms: number, signal: AbortSignal) => Promise<void>;
   readonly runnerStartTimeoutMs?: number;
@@ -111,6 +114,7 @@ type ResolvedOptions = Required<
     | 'ensureDirectory'
     | 'resolveRealPath'
     | 'makeStartupToken'
+    | 'makeLoopbackToken'
     | 'nowMs'
     | 'wait'
     | 'runnerStartTimeoutMs'
@@ -223,6 +227,8 @@ async function prepareRuntime(input: {
   readonly dataDir: string;
   readonly runtimeDir: string;
 }): Promise<MiniAppNodeRuntime> {
+  // One credential per process generation: every port attempt reuses it.
+  const loopbackToken = input.options.makeLoopbackToken();
   let lastError: unknown;
   for (let index = 0; index < input.options.maxPortAttempts; index += 1) {
     const port = candidatePort(input, index);
@@ -235,18 +241,19 @@ async function prepareRuntime(input: {
     const deadline = input.options.nowMs() + input.options.runnerStartTimeoutMs;
     let attempt: Attempt | undefined;
     try {
-      attempt = await spawnAttempt(input, port);
+      attempt = await spawnAttempt(input, port, loopbackToken);
       const readinessSignal = AbortSignal.any([input.signal, attempt.fatal.signal]);
       await waitForStarted(
         attempt,
         readinessSignal,
         Math.min(input.options.runnerStartTimeoutMs, remaining(deadline, input.options.nowMs)),
       );
-      await waitForTcp({
+      await waitForLoopbackAuth({
         options: input.options,
         port,
         signal: readinessSignal,
         deadline,
+        loopbackToken,
       });
       attempt.startupErrorCapture.complete();
       return preparedRuntime({
@@ -254,6 +261,7 @@ async function prepareRuntime(input: {
         attempt,
         port,
         reservation,
+        loopbackToken,
       });
     } catch (error) {
       const failure = await selectFailureAfterCleanup(error, () =>
@@ -298,6 +306,7 @@ async function cleanupFailedPreparation(
 async function spawnAttempt(
   input: Parameters<typeof prepareRuntime>[0],
   port: number,
+  loopbackToken: string,
 ): Promise<Attempt> {
   const init: MiniAppRunnerInitMessage = {
     type: 'miniapp:init',
@@ -312,6 +321,7 @@ async function spawnAttempt(
       startupToken: input.options.makeStartupToken(),
       nodeDigest: input.candidate.nodeDigest,
     },
+    loopbackToken,
     hostConnectorPolicy: input.candidate.hostConnectorPolicy,
   };
   const physicalRoot = input.physicalRoots.acquire(input.candidate.pluginId);
@@ -607,27 +617,34 @@ function waitForStarted(attempt: Attempt, signal: AbortSignal, timeoutMs: number
   });
 }
 
-async function waitForTcp(input: {
+async function waitForLoopbackAuth(input: {
   readonly options: ResolvedOptions;
   readonly port: number;
   readonly signal: AbortSignal;
   readonly deadline: number;
+  readonly loopbackToken: string;
 }): Promise<void> {
   let lastError: unknown;
   for (;;) {
     throwIfAborted(input.signal);
     try {
-      await input.options.connectPort({
-        host: LOOPBACK_HOST,
-        port: input.port,
-        timeoutMs: Math.min(
-          input.options.tcpConnectTimeoutMs,
-          remaining(input.deadline, input.options.nowMs),
-        ),
-        signal: input.signal,
-      });
+      await probeLoopbackAuth(
+        {
+          host: LOOPBACK_HOST,
+          port: input.port,
+          timeoutMs: Math.min(
+            input.options.tcpConnectTimeoutMs,
+            remaining(input.deadline, input.options.nowMs),
+          ),
+          signal: input.signal,
+        },
+        input.loopbackToken,
+      );
       return;
     } catch (error) {
+      // A port answered wrongly keeps answering wrongly, so only a failed connection is
+      // retried while the child is still binding.
+      if (isProbeRejection(error)) throw error;
       lastError = error;
     }
     const delay = Math.min(
@@ -636,11 +653,96 @@ async function waitForTcp(input: {
     );
     await input.options.wait(delay, input.signal);
     if (input.options.nowMs() >= input.deadline) {
-      throw new MiniAppNodeRuntimeError('READINESS_TIMEOUT', 'TCP readiness timed out', {
+      throw new MiniAppNodeRuntimeError('READINESS_TIMEOUT', 'Loopback readiness timed out', {
         cause: lastError,
       });
     }
   }
+}
+
+interface ReadinessProbeInput {
+  readonly host: typeof LOOPBACK_HOST;
+  readonly port: number;
+  readonly timeoutMs: number;
+  readonly signal: AbortSignal;
+}
+
+/**
+ * Proves the Host guard owns the port: an anonymous health check must be rejected before the
+ * credentialed one is answered by the guard itself. Readiness therefore proves the guard is in the
+ * path, not merely that a socket accepts.
+ */
+async function probeLoopbackAuth(input: ReadinessProbeInput, token: string): Promise<void> {
+  const anonymous = await requestLoopbackHealth(input, undefined);
+  if (anonymous !== 401) {
+    throw new MiniAppNodeRuntimeError(
+      'READINESS_PROBE_REJECTED',
+      `unauthenticated health probe expected 401, received ${anonymous}`,
+    );
+  }
+  const authenticated = await requestLoopbackHealth(input, token);
+  if (authenticated !== 204) {
+    throw new MiniAppNodeRuntimeError(
+      'READINESS_PROBE_REJECTED',
+      `authenticated health probe expected 204, received ${authenticated}`,
+    );
+  }
+}
+
+function isProbeRejection(error: unknown): boolean {
+  return error instanceof MiniAppNodeRuntimeError && error.code === 'READINESS_PROBE_REJECTED';
+}
+
+function requestLoopbackHealth(
+  input: ReadinessProbeInput,
+  token: string | undefined,
+): Promise<number> {
+  if (input.signal.aborted) return Promise.reject(input.signal.reason);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (outcome: { readonly status: number } | { readonly error: unknown }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      input.signal.removeEventListener('abort', onAbort);
+      if ('status' in outcome) {
+        resolve(outcome.status);
+        return;
+      }
+      request.destroy();
+      reject(outcome.error);
+    };
+    const request = httpRequest(
+      {
+        host: input.host,
+        port: input.port,
+        method: 'GET',
+        path: MINIAPP_LOOPBACK_HEALTH_PATH,
+        agent: false,
+        headers: token ? { [MINIAPP_LOOPBACK_TOKEN_HEADER]: token } : {},
+      },
+      (response) => {
+        response.on('error', () => undefined);
+        response.resume();
+        finish({ status: response.statusCode ?? 0 });
+      },
+    );
+    const onAbort = () => finish({ error: input.signal.reason });
+    const timer = setTimeout(
+      () =>
+        finish({
+          error: new MiniAppNodeRuntimeError(
+            'READINESS_PROBE_TIMEOUT',
+            'Loopback auth probe request timed out',
+          ),
+        }),
+      Math.max(1, input.timeoutMs),
+    );
+    timer.unref();
+    request.on('error', (error) => finish({ error }));
+    input.signal.addEventListener('abort', onAbort, { once: true });
+    request.end();
+  });
 }
 
 function preparedRuntime(
@@ -648,6 +750,7 @@ function preparedRuntime(
     readonly attempt: Attempt;
     readonly port: number;
     readonly reservation?: { release(): void };
+    readonly loopbackToken: string;
   },
 ): MiniAppNodeRuntime {
   let stopPromise: Promise<{ readonly proven: boolean }> | undefined;
@@ -698,6 +801,7 @@ function preparedRuntime(
     nodeDigest: input.candidate.nodeDigest,
     port: input.port,
     origin: `http://${LOOPBACK_HOST}:${input.port}`,
+    loopbackToken: input.loopbackToken,
     ...(input.attempt.connector ? { hostConnectorSession: input.attempt.connector } : {}),
     closed: input.attempt.closed,
     stop() {
@@ -789,6 +893,7 @@ function resolveOptions(options: NodeRuntimeOptions): ResolvedOptions {
     },
     resolveRealPath: realpath,
     makeStartupToken: randomUUID,
+    makeLoopbackToken: () => randomBytes(32).toString('base64url'),
     nowMs: Date.now,
     wait: defaultWait,
     runnerStartTimeoutMs: 10_000,

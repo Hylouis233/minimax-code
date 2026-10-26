@@ -1,8 +1,15 @@
+import { timingSafeEqual } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
+import http from 'node:http';
 import path from 'node:path';
+import type { Duplex } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import type { MiniAppHostConnectorPolicy } from '../../contracts.js';
+import {
+  MINIAPP_LOOPBACK_HEALTH_PATH,
+  MINIAPP_LOOPBACK_TOKEN_HEADER,
+  type MiniAppHostConnectorPolicy,
+} from '../../contracts.js';
 import { boundMiniAppRuntimeErrorText } from '../../errors.js';
 import {
   createMiniAppHostConnectorRuntimeClient,
@@ -43,6 +50,8 @@ export interface MiniAppRunnerInitMessage {
   readonly dataDir: string;
   readonly listen: { readonly host: '127.0.0.1'; readonly port: number };
   readonly readiness: { readonly startupToken: string; readonly nodeDigest: string };
+  /** Per-process loopback credential. Consumed by the HTTP guard; never enters plugin context. */
+  readonly loopbackToken: string;
   readonly hostConnectorPolicy: MiniAppHostConnectorPolicy;
 }
 
@@ -115,6 +124,8 @@ export async function startMiniAppModule(
 ): Promise<RunningMiniAppModule> {
   const resolveRealPath = options.resolveRealPath ?? realpath;
   const packageRoot = await resolveRealPath(init.packageRoot);
+  // Must precede loading the entry: plugin servers inherit the guard from the patched prototype.
+  installMiniAppLoopbackGuard({ port: init.listen.port, token: init.loopbackToken });
   const start = await loadStartFunction(init, packageRoot, resolveRealPath, options.loadModule);
   assertConnectorAvailable(init, options.createHostConnector);
   const abortController = new AbortController();
@@ -404,6 +415,77 @@ async function startWithStdioConnector(
   }
 }
 
+const GUARDED_REQUEST_EVENTS: ReadonlySet<string> = new Set([
+  'request',
+  'checkContinue',
+  'checkExpectation',
+]);
+const GUARDED_SOCKET_EVENTS: ReadonlySet<string> = new Set(['upgrade', 'connect']);
+
+/**
+ * Authenticates every `node:http` server in this process before plugin code can observe a request.
+ * Only the Host-issued credential on the exact loopback Host passes; `GET /__mavis/health` is
+ * answered here so readiness proves the guard is in the path rather than merely that a socket accepts.
+ */
+function installMiniAppLoopbackGuard(input: { readonly port: number; readonly token: string }): void {
+  const prototype = http.Server.prototype;
+  const originalEmit = prototype.emit;
+  const expectedHost = `127.0.0.1:${input.port}`;
+  const expectedToken = Buffer.from(input.token, 'utf8');
+  const authorized = (request: http.IncomingMessage) =>
+    request.headers.host === expectedHost &&
+    tokenMatches(request.headers[MINIAPP_LOOPBACK_TOKEN_HEADER], expectedToken);
+  prototype.emit = function guardedEmit(
+    this: http.Server,
+    event: string | symbol,
+    ...args: unknown[]
+  ) {
+    if (typeof event === 'string' && GUARDED_REQUEST_EVENTS.has(event)) {
+      const [request, response] = args as [http.IncomingMessage, http.ServerResponse];
+      if (!authorized(request)) {
+        response.writeHead(401).end();
+        return true;
+      }
+      if (isHealthRequest(request)) {
+        response.writeHead(204).end();
+        return true;
+      }
+      stripLoopbackToken(request);
+    } else if (typeof event === 'string' && GUARDED_SOCKET_EVENTS.has(event)) {
+      const [request, socket] = args as [http.IncomingMessage, Duplex];
+      if (!authorized(request)) {
+        socket.destroy();
+        return true;
+      }
+      stripLoopbackToken(request);
+    }
+    return Reflect.apply(originalEmit, this, [event, ...args]) as boolean;
+  } as typeof prototype.emit;
+}
+
+function tokenMatches(value: string | string[] | undefined, expected: Buffer): boolean {
+  if (typeof value !== 'string') return false;
+  const actual = Buffer.from(value, 'utf8');
+  return actual.byteLength === expected.byteLength && timingSafeEqual(actual, expected);
+}
+
+/** Application code never needs the credential; removing it keeps proxies and header dumps clean. */
+function stripLoopbackToken(request: http.IncomingMessage): void {
+  delete request.headers[MINIAPP_LOOPBACK_TOKEN_HEADER];
+  const raw = request.rawHeaders;
+  for (let index = raw.length - 2; index >= 0; index -= 2) {
+    if (raw[index]?.toLowerCase() === MINIAPP_LOOPBACK_TOKEN_HEADER) raw.splice(index, 2);
+  }
+}
+
+function isHealthRequest(request: http.IncomingMessage): boolean {
+  const url = request.url ?? '';
+  return (
+    request.method === 'GET' &&
+    (url === MINIAPP_LOOPBACK_HEALTH_PATH || url.startsWith(`${MINIAPP_LOOPBACK_HEALTH_PATH}?`))
+  );
+}
+
 export function isMiniAppRunnerInitMessage(value: unknown): value is MiniAppRunnerInitMessage {
   if (!isRecord(value)) return false;
   const keys = [
@@ -416,6 +498,7 @@ export function isMiniAppRunnerInitMessage(value: unknown): value is MiniAppRunn
     'dataDir',
     'listen',
     'readiness',
+    'loopbackToken',
     'hostConnectorPolicy',
   ];
   if (!hasExactKeys(value, keys)) return false;
@@ -425,8 +508,13 @@ export function isMiniAppRunnerInitMessage(value: unknown): value is MiniAppRunn
     hasStringIdentityFields(value) &&
     isListenAddress(value.listen) &&
     isReadinessIdentity(value.readiness) &&
+    isLoopbackToken(value.loopbackToken) &&
     isConnectorPolicy(value.hostConnectorPolicy)
   );
+}
+
+function isLoopbackToken(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0;
 }
 
 function hasStringIdentityFields(value: Record<string, unknown>): boolean {

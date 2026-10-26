@@ -1,6 +1,12 @@
 /** Largest `agentConcurrency` a Mini App manifest may declare. */
 export const MINIAPP_AGENT_MAX_CONCURRENCY = 32;
 
+/** Every Mini App HTTP server answers this path from the guard, never from plugin code. */
+export const MINIAPP_LOOPBACK_HEALTH_PATH = '/__mavis/health';
+
+/** Request header carrying the Host-issued loopback credential. */
+export const MINIAPP_LOOPBACK_TOKEN_HEADER = 'x-mavis-miniapp-token';
+
 export type MiniAppHostConnectorPolicy =
   | { readonly kind: 'deny-all' }
   | { readonly kind: 'allowlist'; readonly providers: readonly string[] };
@@ -94,6 +100,8 @@ export interface MiniAppNodeRuntime {
   readonly nodeDigest: string;
   readonly port: number;
   readonly origin: string;
+  /** Server-only: the proxy injects it. Never forwarded to a renderer or a published view. */
+  readonly loopbackToken: string;
   readonly hostConnectorSession?: MiniAppHostConnectorSession;
   readonly closed: Promise<MiniAppRuntimeExit>;
   stop(): Promise<{ readonly proven: boolean }>;
