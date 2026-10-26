@@ -1661,6 +1661,7 @@
     "packages/local-runtime-v2/test/unit/agent/storage/agent.repository.test.ts",
     "packages/local-runtime-v2/test/unit/agent/storage/canonical-agent-config.test.ts",
     "packages/local-runtime-v2/test/unit/compat/v1/runtime.test.ts",
+    "packages/local-runtime-v2/test/unit/miniapp/loopback-guard.test.ts",
     "packages/local-runtime-v2/test/unit/plugin-system/miniapp-manifest.test.ts",
     "packages/local-runtime/assets/prompts/code-review/review-candidates.md",
     "packages/local-runtime/assets/prompts/code-review/reviewer-system.md",
