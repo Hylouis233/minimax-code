@@ -59,3 +59,65 @@ export interface WebuiMiniAppView {
   readonly pluginId: string;
   readonly viewUrl: string;
 }
+
+// ---------------------------------------------------------------------------
+// The page bridge: the composer half, over `postMessage`.
+//
+// ADR 0020 lists "how a page's request identifier survives the `postMessage`
+// boundary" as the one open implementation question, so the answer is written
+// down here rather than left to the page and the host to guess at separately:
+// the page mints the request id, the host echoes it in the reply, and a reply
+// that names no live request is dropped.
+//
+// The shapes are the shipped contract's (`@mavis/shared/miniapp-surface`): the
+// failure codes and the text bound are copied rather than imported because this
+// module is a wire contract the browser bundle may hold, and the shipped module
+// is the runtime's. A change there is a change here, and the two constants are
+// pinned together by the bridge test.
+// ---------------------------------------------------------------------------
+
+/** Absolute path on the Mini App's proxy origin that serves the bridge script. */
+export const WEBUI_MINIAPP_BRIDGE_PATH = "/__miniapp/bridge.js";
+
+/** The page's append request, page → host. */
+export const WEBUI_MINIAPP_BRIDGE_APPEND_REQUEST = "mcode:miniapp:message-append" as const;
+
+/** The host's answer, host → page. */
+export const WEBUI_MINIAPP_BRIDGE_APPEND_REPLY = "mcode:miniapp:message-append-result" as const;
+
+/** The shipped contract's bound (`MINIAPP_COMPOSER_MAX_TEXT_LENGTH`). */
+export const WEBUI_MINIAPP_COMPOSER_MAX_TEXT_LENGTH = 100_000;
+
+/** The shipped contract's composer failure codes, in its order. */
+export type WebuiMiniAppComposerFailureCode =
+  | "user_cancelled"
+  | "invalid_request"
+  | "text_too_large"
+  | "not_allowed"
+  | "target_unavailable"
+  | "result_unknown";
+
+/**
+ * What the page is told about one append.
+ *
+ * Success acknowledges a draft append — never a sent message and never a disk
+ * commit. `user_cancelled` is the person declining the confirmation, and it is a
+ * refusal like any other: the page cannot tell a decline from a policy refusal
+ * apart from the code, and it must not retry either.
+ */
+export type WebuiMiniAppComposerResult =
+  | { readonly success: true }
+  | { readonly success: false; readonly code: WebuiMiniAppComposerFailureCode };
+
+/** One append request, as the page sent it. */
+export interface WebuiMiniAppBridgeAppendRequest {
+  readonly requestId: string;
+  readonly text: string;
+}
+
+/** The host's reply for one request. */
+export interface WebuiMiniAppBridgeAppendReply {
+  readonly type: typeof WEBUI_MINIAPP_BRIDGE_APPEND_REPLY;
+  readonly requestId: string;
+  readonly result: WebuiMiniAppComposerResult;
+}

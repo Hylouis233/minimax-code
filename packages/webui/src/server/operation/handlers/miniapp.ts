@@ -25,6 +25,11 @@ import {
   type MiniAppProxy,
   type MiniAppProxyTarget,
 } from "../../miniapp/proxy.js";
+import {
+  createMiniAppProxyRegistry,
+  type MiniAppProxyRegistry,
+} from "../../miniapp/proxy-registry.js";
+import { miniAppPageBridge } from "../../miniapp/bridge.js";
 import type {
   WebuiOperationContext,
   WebuiOperationHandler,
@@ -83,15 +88,28 @@ export interface MiniAppHandlerOptions {
    * the port a plugin's URL is derived from.
    */
   readonly startProxy?: typeof startMiniAppProxy;
+  /**
+   * The registry those listeners live in.
+   *
+   * Passed when the host wants them closed at service shutdown — a leaked
+   * listener holds a plugin's derived port, so the next start of that Mini App
+   * fails to bind. With none, this handler owns a private registry.
+   */
+  readonly proxies?: MiniAppProxyRegistry;
 }
 
 export function createMiniAppHandlerEntries(
   port: WebuiOperationPort,
   options: MiniAppHandlerOptions = {},
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
-  const startProxy = options.startProxy ?? startMiniAppProxy;
-  /** The live listener per plugin. */
-  const proxies = new Map<string, MiniAppProxy>();
+  /**
+   * The listeners. A caller that wants them closed on shutdown passes the
+   * registry it will close (`service.miniappProxies`); with none, this handler
+   * keeps a private one, which is what a test or an embedded host gets.
+   */
+  const proxies =
+    options.proxies ??
+    createMiniAppProxyRegistry(options.startProxy ? { start: options.startProxy } : {});
   /**
    * The last call per plugin, so two calls cannot interleave.
    *
@@ -120,22 +138,18 @@ export function createMiniAppHandlerEntries(
   }
 
   /** Replaces the plugin's listener, closing the old one before binding the new. */
-  async function replaceProxy(target: MiniAppProxyTarget): Promise<MiniAppProxy> {
-    const existing = proxies.get(target.pluginId);
-    if (existing) {
-      proxies.delete(target.pluginId);
-      await existing.close();
-    }
-    const proxy = await startProxy({ target });
-    proxies.set(target.pluginId, proxy);
-    return proxy;
+  function replaceProxy(target: MiniAppProxyTarget): Promise<MiniAppProxy> {
+    return proxies.start({
+      target,
+      // The page bridge is injected into the document the proxy serves, and it has
+      // to be there before the page's own scripts run — the Mini App asks for
+      // `window.mcode.miniapp` as it boots.
+      bridge: miniAppPageBridge(),
+    });
   }
 
   async function closeProxy(pluginId: string): Promise<void> {
-    const proxy = proxies.get(pluginId);
-    if (!proxy) return;
-    proxies.delete(pluginId);
-    await proxy.close();
+    await proxies.close(pluginId);
   }
 
   const listMiniApps: DedicatedHandler<typeof listMiniAppsOperation> = async () => ({

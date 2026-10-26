@@ -477,7 +477,10 @@
       "packages/webui/test/unit/miniapp-proxy.test.ts",
       "packages/webui/test/unit/miniapp-presenter.test.ts",
       "packages/webui/test/unit/miniapp-operations.test.ts",
-      "packages/webui/test/unit/workspace-write-fence.test.ts"
+      "packages/webui/test/unit/workspace-write-fence.test.ts",
+      "packages/webui/test/unit/miniapp-client-state.test.ts",
+      "packages/webui/test/unit/miniapp-bridge.test.ts",
+      "packages/webui/test/unit/miniapp-surfaces.test.tsx"
     ]
   }
 }

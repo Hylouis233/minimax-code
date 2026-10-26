@@ -71,6 +71,7 @@ import { WebuiPortSlicesProvider } from "../bindings/port-slices-context.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useWebuiApplicationOptional } from "../bindings/application-context.js";
+import { WebuiMiniAppWorkflowsProvider } from "../features/miniapp/bindings/use-miniapp-workflows.js";
 import {
   WebuiPluginWorkflowsProvider,
   WebuiSessionWorkflowsProvider,
@@ -280,6 +281,11 @@ export function WebuiClientFoundationApp(
     void settingsWorkflows.loadVersion();
   }, [runtimeVersion, settingsWorkflows]);
   const pluginWorkflows = application.pluginWorkflows;
+  // The Mini App business's owner: the catalogue, the views and the bridge's host
+  // half. Provided at the root because two surfaces read it — the plugin
+  // catalogue's apps area and the workspace panel's launcher — and neither may
+  // construct a second owner.
+  const miniAppWorkflows = application.miniAppWorkflows;
   // The composer's view of what is installed and what the agent can run. It is a
   // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
   // plugin manager are two readers with two identities, so neither overwrites the
@@ -814,6 +820,7 @@ export function WebuiClientFoundationApp(
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
     <WebuiModelsWorkflowsProvider workflows={modelsWorkflows}>
     <WebuiSettingsWorkflowsProvider workflows={settingsWorkflows}>
+    <WebuiMiniAppWorkflowsProvider workflows={miniAppWorkflows}>
     <WebuiPluginWorkflowsProvider workflows={pluginWorkflows}>
     <WebuiSessionWorkflowsProvider workflows={sessionWorkflows}>
     <WebuiApplicationProvider application={application}>
@@ -1017,6 +1024,7 @@ export function WebuiClientFoundationApp(
     </WebuiApplicationProvider>
     </WebuiSessionWorkflowsProvider>
     </WebuiPluginWorkflowsProvider>
+    </WebuiMiniAppWorkflowsProvider>
     </WebuiSettingsWorkflowsProvider>
     </WebuiModelsWorkflowsProvider>
     </WebuiAccountWorkflowsProvider>

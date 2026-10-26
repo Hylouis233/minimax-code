@@ -58,6 +58,12 @@ const EXPECTED: Record<
     "listBrowserCapabilities",
     "getBrowserInstallationKey",
   ],
+  miniapp: [
+    "listMiniApps", "openMiniApp", "stopMiniApp",
+    // A Mini App is a plugin, so the catalogue's apps area writes the package
+    // lifecycle through the same member the plugin manager does.
+    "pluginManagement",
+  ],
   composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
   interactions: [
     "listPendingPermissions", "getPendingQuestionnaire", "replyPermission",

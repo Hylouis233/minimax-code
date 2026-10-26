@@ -153,6 +153,7 @@ export type WebuiForwardedRuntimeHostOptions = Pick<
   | "authContextInvalidator"
   | "browserAdapter"
   | "browserToolExposure"
+  | "miniAppSurface"
 >;
 
 /**
@@ -196,6 +197,21 @@ export interface CreateWebuiRuntimeHostOptions {
   /** Browser provider explicitly owned by the WebUI process, when enabled. */
   readonly browserProvider?: WebuiBrowserProvider;
   readonly browserToolExposure?: WebuiBrowserToolExposure;
+  /**
+   * The Mini App presenter, when this client supplies one.
+   *
+   * The runtime's `MiniAppPresenter` is a host-owned port: on the desktop client it
+   * moves a native view, and here it is the browser implementation
+   * (`server/miniapp/presenter.ts`). It is an option rather than something the
+   * assembly builds because the two sides may not import each other — the server
+   * holds the presenter, the runtime holds the port — so the file outside the layer
+   * system (an entry script) is what joins them.
+   *
+   * `undefined` is a host whose runtime has no presenter: the agent's `open` action
+   * then refuses with `OPEN_UNAVAILABLE`, which is why the Mini App service cell is
+   * not enabled until a presenter and a view both exist.
+   */
+  readonly miniAppSurface?: NonNullable<CreateLocalRuntimeHostOptions["miniAppSurface"]>;
   /** Defaults to the configured beta switch, but the effective runtime value is readiness-gated. */
   readonly mcodeToolsRequested?: boolean;
   readonly mcodeTools?: {
@@ -334,6 +350,7 @@ export async function createWebuiRuntimeHost(
     ...(browser.browserToolExposure
       ? { browserToolExposure: browser.browserToolExposure }
       : {}),
+    ...(options.miniAppSurface ? { miniAppSurface: options.miniAppSurface } : {}),
   };
   // The factory signature is the runtime's own: `forwardedOptions` is derived
   // from `CreateLocalRuntimeHostOptions`, so the call is checked field by field

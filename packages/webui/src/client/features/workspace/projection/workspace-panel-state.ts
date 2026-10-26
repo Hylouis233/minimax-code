@@ -62,6 +62,20 @@ export type WebuiWorkspaceTabContent =
       readonly selectedPath?: string;
     }
   | {
+      /**
+       * A Mini App's page, framed from the proxy the service answered with.
+       *
+       * The tab names the plugin it shows and the session it belongs to, and
+       * nothing else: the view URL, the runtime state and the bridge live in the
+       * Mini App business, which is the only owner of them (ADR 0020). The panel
+       * stays the layout owner, so what it carries is where the view goes and
+       * which Mini App it is — not how the page is produced.
+       */
+      readonly kind: "miniapp";
+      readonly sessionId: string;
+      readonly pluginId: string;
+    }
+  | {
       readonly kind: "web";
       /**
        * The target the web tab is bound to.
@@ -156,6 +170,8 @@ export function webuiWorkspaceTabContentKey(content: WebuiWorkspaceTabContent): 
       }`;
     case "web":
       return `web:${content.target.browserId}:${content.target.targetId}`;
+    case "miniapp":
+      return `miniapp:${content.sessionId}:${content.pluginId}`;
     case "launcher":
       return "launcher";
     default:
@@ -197,6 +213,15 @@ export const WEBUI_WORKSPACE_TAB_KINDS: Readonly<
    */
   web: { label: "网页", tile: null },
   /**
+   * A Mini App's page.
+   *
+   * The tile opens the picker rather than a view: which Mini App a tab shows is
+   * chosen from the runtime's own listing, so the tile's command carries no
+   * `pluginId` and the reducer opens nothing for it. The picker dispatches the
+   * same `open-tab` with the plugin filled in.
+   */
+  miniapp: { label: "应用", tile: { type: "open-tab", kind: "miniapp" } },
+  /**
    * The new tab page.
    *
    * It has no tile of its own: it is the page the tiles are on, opened by the
@@ -213,6 +238,7 @@ export const WEBUI_WORKSPACE_LAUNCHER_TILE_ORDER: readonly WebuiWorkspaceTabKind
   "review",
   "terminal",
   "canvas",
+  "miniapp",
   "files",
 ];
 
@@ -242,6 +268,11 @@ export function webuiWorkspaceTabLabel(tab: WorkspacePanelTab): string {
   // A web tab is titled by the page, and the title is the runtime's to
   // report. A tab whose page has no title yet falls back to the registry's word.
   if (content.kind === "web") return content.title || WEBUI_WORKSPACE_TAB_KINDS.web.label;
+  // A Mini App tab is named by the plugin it shows. The display name belongs to
+  // the Mini App business's catalogue, which the panel does not read: two tabs
+  // showing two plugins are still two tabs, and the plugin id is what tells them
+  // apart without the panel learning any Mini App state.
+  if (content.kind === "miniapp") return content.pluginId;
   return WEBUI_WORKSPACE_TAB_KINDS[content.kind].label;
 }
 
@@ -605,14 +636,39 @@ export function reduceWorkspacePanelState(state: WorkspacePanelState, command: W
       return openNewTab(state, content);
     }
     case "open-tab": {
+      // A Mini App tab names the plugin it shows and the session it belongs to,
+      // so it is not the generic "kind + scope" content the other tiles produce:
+      // a command carrying neither opens nothing rather than an empty frame —
+      // which is exactly what the launcher's own tile sends before a Mini App is
+      // chosen, since the tile opens the picker instead of a view.
+      const kind = command.kind;
+      if (kind === "miniapp") {
+        const { pluginId, sessionId: miniAppSessionId } = command;
+        if (!pluginId || !miniAppSessionId) return state;
+        const miniAppContent: WebuiWorkspaceTabContent = {
+          kind: "miniapp",
+          sessionId: miniAppSessionId,
+          pluginId,
+        };
+        if (command.tabId) return replaceTabContent(state, command.tabId, miniAppContent);
+        const existingMiniApp = tabShowing(
+          state,
+          (candidate) =>
+            candidate.kind === "miniapp" &&
+            candidate.pluginId === pluginId &&
+            candidate.sessionId === miniAppSessionId,
+        );
+        if (existingMiniApp) return activate(state, { ...existingMiniApp, content: miniAppContent });
+        return openNewTab(state, miniAppContent);
+      }
       const content: WebuiWorkspaceTabContent = {
-        kind: command.kind,
+        kind,
         ...(command.sessionId ? { sessionId: command.sessionId } : {}),
         ...(command.workspaceDir ? { workspaceDir: command.workspaceDir } : {}),
       };
       // A tile on the new tab page opens its view in the tab the tile is on.
       if (command.tabId) return replaceTabContent(state, command.tabId, content);
-      const existing = tabShowing(state, (candidate) => isSameInstance(candidate, command.kind, command.sessionId, command.workspaceDir));
+      const existing = tabShowing(state, (candidate) => isSameInstance(candidate, kind, command.sessionId, command.workspaceDir));
       if (existing) return activate(state, { ...existing, content });
       return openNewTab(state, content);
     }

@@ -29,8 +29,16 @@ export interface MiniAppPresenterView {
 }
 
 export interface CreateMiniAppPresenterInput {
-  /** The client's ordinary selection path: what a person clicking the session rail gets. */
-  readonly selectSession: (input: { readonly sessionId: string; readonly pluginId: string }) => void;
+  /**
+   * The client's ordinary selection path, where there is one.
+   *
+   * Optional because selection belongs to the client document: the WebUI's rail
+   * is browser state, and this presenter runs on the server, which cannot select
+   * anything. What it records is the presentation — which session's panel is
+   * showing which Mini App — and the client reads that through the view it
+   * mounts. A host that does own a selection path supplies it.
+   */
+  readonly selectSession?: (input: { readonly sessionId: string; readonly pluginId: string }) => void;
   /** Reports the panel as closed when its Mini App stops being shown. */
   readonly onClosed?: (input: { readonly pluginId: string }) => void;
 }
@@ -49,7 +57,7 @@ export function createMiniAppPresenter(input: CreateMiniAppPresenterInput): Mini
       async open(openInput) {
         openInput.signal?.throwIfAborted();
         presentation = { sessionId: openInput.sessionId, pluginId: openInput.pluginId };
-        input.selectSession({ sessionId: openInput.sessionId, pluginId: openInput.pluginId });
+        input.selectSession?.({ sessionId: openInput.sessionId, pluginId: openInput.pluginId });
       },
       async close(closeInput) {
         if (presentation?.pluginId !== closeInput.pluginId) return;

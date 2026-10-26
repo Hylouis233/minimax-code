@@ -3,6 +3,7 @@ import type { WebuiComposerController, WebuiComposerControllerSnapshot, WebuiCom
 import type { WebuiComposerStore } from "./composer-store.js";
 import type { WebuiComposerSubmitIntent } from "../contracts/composer-controller.js";
 import type { WebuiComposerStagingState } from "../contracts/composer-state.js";
+import { WEBUI_COMPOSER_HOME_KEY } from "../contracts/composer-state.js";
 import type { WebuiRunCommandRequest, WebuiCommandWorkflows } from "./command-workflows.js";
 import type { WebuiConversationTurnCommands } from "../../turn/contracts/turn-commands.js";
 import type { WebuiSubmissionCompletion, WebuiSubmissionTicket } from "../../turn/contracts/submission.js";
@@ -55,7 +56,7 @@ export interface WebuiComposerControllerDeps {
   readonly clearHomeTurn: () => void;
 }
 
-const HOME_KEY = "__webui_composer_home__";
+const HOME_KEY = WEBUI_COMPOSER_HOME_KEY;
 
 /** Application coordinator for the existing composer store and owners. */
 export function createWebuiComposerController(deps: WebuiComposerControllerDeps): WebuiComposerController {

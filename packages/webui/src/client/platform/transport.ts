@@ -136,6 +136,9 @@ import {
   OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
+  LIST_MINI_APPS_OPERATION_NAME,
+  OPEN_MINI_APP_OPERATION_NAME,
+  STOP_MINI_APP_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
@@ -262,6 +265,9 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
     getBrowserInstallationKey: (body) =>
       request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),
+    listMiniApps: () => request(LIST_MINI_APPS_OPERATION_NAME, undefined),
+    openMiniApp: (body) => request(OPEN_MINI_APP_OPERATION_NAME, body),
+    stopMiniApp: (body) => request(STOP_MINI_APP_OPERATION_NAME, body),
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>
       stream(SEND_MESSAGE_OPERATION_NAME, body, onFrame, onDelivery),

@@ -39,6 +39,7 @@ import type {
 } from "./operation-contract.js";
 import type { WebuiTerminalProcessPort } from "../../runtime/port.js";
 import type { WebuiBrowserPort } from "../../runtime/port.js";
+import type { MiniAppProxyRegistry } from "../miniapp/proxy-registry.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
@@ -84,6 +85,11 @@ export function createOperationRegistry(
    * answers `not_provisioned` rather than failing to assemble.
    */
   browserInstallationKeys?: WebuiBrowserBridgeInstallationKeySource,
+  /**
+   * The Mini App listeners. Passing one lets the service close them on shutdown;
+   * omitting it leaves the Mini App handlers holding a private registry.
+   */
+  miniAppProxies?: MiniAppProxyRegistry,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
@@ -93,7 +99,7 @@ export function createOperationRegistry(
     ...createAccountHandlerEntries(port),
     ...createStreamHandlerEntries(port),
     ...createMessageHandlerEntries(port),
-    ...createMiniAppHandlerEntries(port),
+    ...createMiniAppHandlerEntries(port, miniAppProxies ? { proxies: miniAppProxies } : {}),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
     ...(browser ? createBrowserHandlerEntries(browser, browserInstallationKeys) : []),
   ]);

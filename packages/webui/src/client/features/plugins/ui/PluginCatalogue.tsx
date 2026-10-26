@@ -26,6 +26,7 @@ import type {
   WebuiPluginGithubSource,
   WebuiPluginIntent,
 } from "../contracts/plugin-actions.js";
+import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -582,6 +583,16 @@ export function PluginCatalogue({
           showAll={showAllCatalogue}
           onToggleAll={() => setShowAllCatalogue((value) => !value)}
           onIntent={(intent) => void mutate(intent)}
+        />
+      ) : area === "apps" ? (
+        /* The apps area belongs to the Mini App business: it renders that
+           business's published list, and this page holds none of its state. */
+        <MiniAppAppsList
+          onInstallRequest={() => {
+            setManagementOpen(false);
+            setArea("plugins");
+            setView("market");
+          }}
         />
       ) : (
         <PluginManagementList

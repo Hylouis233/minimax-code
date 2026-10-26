@@ -8,6 +8,8 @@ import {
   WebuiService,
   createOperationRegistry,
   BrowserBridgeServer,
+  createMiniAppProxyRegistry,
+  createMiniAppPresenter,
 } from "../server/server.js";
 import {
   WebuiTerminalManager,
@@ -60,6 +62,8 @@ await browserBridge.start();
 // adapter anywhere else would put the Agent on a second browser, and the panel
 // would show the first.
 const browser = createBrowserAdapter({ dataDir, bridge: browserBridge });
+const miniAppPresenter = createMiniAppPresenter({});
+const miniappProxies = createMiniAppProxyRegistry();
 const assembled = await createWebuiRuntimeHost({
   dataDir,
   appVersion: version,
@@ -70,6 +74,9 @@ const assembled = await createWebuiRuntimeHost({
   // One compact Browser tool over the restricted command set. The detailed
   // per-action tools would re-offer the same actions under their own names.
   browserToolExposure: "compact",
+  // The runtime's Mini App presenter, implemented by this client. Supplied here
+  // because the runtime may not import the server that holds it.
+  miniAppSurface: miniAppPresenter.presenter,
 });
 browser.attachHost(assembled.host);
 // A session's pages are released when the session ends -- deleted, archived
@@ -88,13 +95,15 @@ const terminal = new WebuiTerminalManager();
 await browser.initialize();
 const service = new WebuiService({
   port,
-  operations: createOperationRegistry(port, terminal, browser.port, browserBridge),
+  operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies),
   terminal,
   host: "127.0.0.1",
   tcpPort,
   dev: true,
   clientDir: path.join(packageRoot, "client"),
   browserBridge,
+  // Closed on shutdown: a leaked Mini App listener holds a plugin's derived port.
+  miniappProxies,
 });
 
 let closing;

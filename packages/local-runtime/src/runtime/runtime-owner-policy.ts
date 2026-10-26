@@ -376,9 +376,11 @@ export function resolveRuntimeOwnerPolicy(
           // layer and with it the questionnaire service.
           ownsV2Runtime: isV2RuntimeOwner('tui', electronHost, cliEmbedded),
           schedulerHost: true,
-          // Stays false until the presenter and the view land with it: a cell flipped on its own
-          // leaves the agent able to start a Mini App that nothing can display.
-          miniAppService: false,
+          // Enabled with the presenter and the view that landed beside it (ADR 0020):
+          // the browser presenter records the presentation, and the workspace panel's
+          // `miniapp` tab frames the proxy URL the open operation answers with. Flipped
+          // earlier, the agent could start a Mini App that nothing can display.
+          miniAppService: true,
           cronService: true,
           channelService: false,
           browserActivation: 'explicit-config',

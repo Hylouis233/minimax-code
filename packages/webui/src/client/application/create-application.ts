@@ -40,6 +40,7 @@ import { createWebuiAccountWorkflows } from "../features/account/application/acc
 import { createWebuiModelsWorkflows } from "../features/models/application/models-workflows.js";
 import { createWebuiSettingsWorkflows } from "../features/settings/application/settings-workflows.js";
 import { createWebuiPluginWorkflows } from "../features/plugins/application/plugin-workflows.js";
+import { createWebuiMiniAppWorkflows } from "../features/miniapp/application/miniapp-workflows.js";
 import type { WebuiPluginManagementAction } from "../../shared/plugin-management.js";
 import { createWebuiComposerPluginCatalogue } from "../features/plugins/application/composer-catalogue.js";
 import { createWebuiPluginActions } from "../features/plugins/contracts/plugin-actions.js";
@@ -352,6 +353,8 @@ export interface WebuiApplication {
   readonly modelsWorkflows: ReturnType<typeof createWebuiModelsWorkflows>;
   /** The plugin manager's owner. */
   readonly pluginWorkflows: ReturnType<typeof createWebuiPluginWorkflows>;
+  /** The Mini App business's owner: catalogue, presentations and refusals. */
+  readonly miniAppWorkflows: ReturnType<typeof createWebuiMiniAppWorkflows>;
   /** The composer's plugin/skill read model, separate from the manager's. */
   readonly composerPluginCatalogue: ReturnType<typeof createWebuiComposerPluginCatalogue>;
   /** The plan-review reply workflow. */
@@ -859,6 +862,10 @@ export function createWebuiApplication(
       }
     },
   });
+  // The Mini App business's owner. It reads the Mini App capability and the
+  // package lifecycle, because the catalogue's apps area performs both: a Mini App
+  // is a plugin, so enabling or uninstalling one is a plugin write.
+  const miniAppWorkflows = createWebuiMiniAppWorkflows({ port: slices.miniapp });
   // The composer's view of what is installed and what the agent can run: a
   // separate read model from `pluginWorkflows` on purpose, so neither overwrites
   // the other when one reloads.
@@ -1002,6 +1009,7 @@ export function createWebuiApplication(
     settingsWorkflows,
     modelsWorkflows,
     pluginWorkflows,
+    miniAppWorkflows,
     composerPluginCatalogue,
     activeTurnProbe,
     planReviewWorkflow,

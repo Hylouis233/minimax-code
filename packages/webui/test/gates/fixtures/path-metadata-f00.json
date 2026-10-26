@@ -4763,6 +4763,96 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/features/miniapp/application/miniapp-bridge.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/application/miniapp-workflows.ts",
+      "layers": [
+        "application"
+      ],
+      "role": "feature-application",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/bindings/use-miniapp-workflows.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/contracts/miniapp-port.ts",
+      "layers": [
+        "contracts"
+      ],
+      "role": "feature-contracts",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/projection/miniapp-view.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/ui/MiniAppAppsList.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/ui/MiniAppPicker.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "client/features/miniapp/ui/MiniAppView.public.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "miniapp",
+      "home": "target"
+    },
+    {
+      "path": "server/miniapp/bridge.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
+    },
+    {
+      "path": "server/miniapp/proxy-registry.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
     }
   ],
   "directions": [

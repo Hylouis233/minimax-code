@@ -53,10 +53,12 @@ import {
   WebuiIconGlobe,
   WebuiIconSearch,
   WebuiIconSend,
+  WebuiIconSites,
   WebuiIconWorkspaceCanvas,
   WebuiIconWorkspaceReview,
   WebuiIconWorkspaceTerminal,
 } from "../../../shell/icons.js";
+import { MiniAppPicker } from "../../miniapp/ui/MiniAppPicker.public.js";
 
 const STRIP_COPY = {
   addTab: "新建标签页",
@@ -166,6 +168,9 @@ function workspaceTabGlyph(item: WorkspacePanelTab): ReactElement {
   }
   if (item.content.kind === "files") {
     return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
+  }
+  if (item.content.kind === "miniapp") {
+    return <WebuiIconSites className="webui-workspace-tab-file-icon" />;
   }
   if (item.content.kind !== "file-preview") {
     return <WebuiIconFile className="webui-workspace-tab-file-icon" />;
@@ -379,6 +384,13 @@ export function WebuiWorkspaceLauncher({
   const slice = useWebuiPortSlice("browser");
   const openBrowserWebTab = slice?.openBrowserWebTab;
   const [typed, setTyped] = useState("");
+  /**
+   * Whether the Mini App picker is open under the tiles.
+   *
+   * Display state, so it stays here: which Mini Apps exist and what state they
+   * are in is the Mini App business's, and the picker reads that itself.
+   */
+  const [pickerOpen, setPickerOpen] = useState(false);
   if (tab.content.kind !== "launcher") return null;
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
@@ -455,7 +467,16 @@ export function WebuiWorkspaceLauncher({
             type="button"
             className="webui-workspace-launcher-tile"
             data-testid={`workspace-launcher-tile-${tile.kind}`}
-            onClick={() => command && dispatch(command)}
+            onClick={() => {
+              // The Mini App tile opens its picker rather than a view: which Mini
+              // App a tab shows is chosen from the runtime's own listing, so the
+              // tab opens once a plugin has been chosen.
+              if (tile.kind === "miniapp") {
+                setPickerOpen((open) => !open);
+                return;
+              }
+              if (command) dispatch(command);
+            }}
           >
             <span className="webui-workspace-launcher-tile-icon" aria-hidden="true">
               {launcherTileGlyph(tile.kind)}
@@ -464,6 +485,19 @@ export function WebuiWorkspaceLauncher({
           </button>
         ))}
       </div>
+      {pickerOpen ? (
+        <MiniAppPicker
+          {...(sessionId ? { sessionId } : {})}
+          onClose={() => setPickerOpen(false)}
+          onOpened={(pluginId) => {
+            setPickerOpen(false);
+            // A Mini App tab belongs to a session, and the panel refuses to exist
+            // without one; with no session in view there is nothing to open into.
+            if (!sessionId) return;
+            dispatch({ type: "open-tab", kind: "miniapp", sessionId, pluginId, tabId: tab.id });
+          }}
+        />
+      ) : null}
       {openBrowserWebTab ? null : (
         <p className="webui-workspace-launcher-unavailable">{STRIP_COPY.launcherUnavailable}</p>
       )}
@@ -570,6 +604,8 @@ function launcherTileGlyph(kind: WebuiWorkspaceLauncherTile["kind"]): ReactEleme
   switch (kind) {
     case "review":
       return <WebuiIconWorkspaceReview className="size-6 shrink-0" />;
+    case "miniapp":
+      return <WebuiIconSites className="size-6 shrink-0" />;
     case "terminal":
       return <WebuiIconWorkspaceTerminal className="size-6 shrink-0" />;
     case "canvas":
