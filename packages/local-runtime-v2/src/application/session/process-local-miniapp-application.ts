@@ -19,7 +19,7 @@ type ProcessLocalMiniAppApplication = NonNullable<LocalRuntimeApplication['miniA
 /** Projects installed MiniApp definitions and Supervisor state for the Electron bridge. */
 export function createProcessLocalMiniAppApplication(
   plugins: MiniAppPluginControl,
-  supervisor: Pick<MiniAppSupervisor, 'inspect'> | undefined,
+  supervisor: Pick<MiniAppSupervisor, 'inspect' | 'launchCredential'> | undefined,
 ): ProcessLocalMiniAppApplication | undefined {
   if (!supervisor) return undefined;
 
@@ -44,12 +44,15 @@ export function createProcessLocalMiniAppApplication(
     ) {
       throw applicationError(status?.failureCode ?? 'RUNTIME_FAILED');
     }
+    const credential = supervisor.launchCredential(miniApp.pluginId);
+    if (credential === undefined) throw applicationError('RUNTIME_FAILED');
     return {
       miniApp: summary(miniApp, status),
       launch: {
         origin: active.origin,
         surfacePath: active.surfacePath,
         runId: active.processGeneration,
+        credential,
       },
     };
   };

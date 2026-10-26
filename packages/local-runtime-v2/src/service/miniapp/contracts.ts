@@ -237,6 +237,11 @@ export interface MiniAppSupervisor extends MiniAppPublicationCoordinator {
     readonly expectedProcessGeneration?: string;
   }): Promise<MiniAppGenerationLease>;
   inspect(pluginId?: string): readonly MiniAppStatus[];
+  /**
+   * Server-only: the live generation's loopback credential, so the proxy that injects it has something
+   * to inject. Never part of a published view and never forwarded to a renderer.
+   */
+  launchCredential(pluginId: string): string | undefined;
   close(): Promise<void>;
 }
 

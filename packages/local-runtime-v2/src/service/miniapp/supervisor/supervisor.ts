@@ -684,6 +684,10 @@ export class DefaultMiniAppSupervisor implements MiniAppSupervisor {
     );
   }
 
+  launchCredential(pluginId: string): string | undefined {
+    return this.active.get(pluginId)?.runtime?.loopbackToken;
+  }
+
   inspect(pluginId?: string): readonly MiniAppStatus[] {
     const ids = pluginId
       ? [pluginId]

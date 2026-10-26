@@ -46,6 +46,11 @@ export interface ProcessLocalMiniAppLaunch {
     readonly origin: string;
     readonly surfacePath: string;
     readonly runId: string;
+    /**
+     * The credential the Mini App's own guard demands. Server-only, like the rest of this object: the
+     * proxy injects it, and no renderer and no published view ever carries it.
+     */
+    readonly credential: string;
   };
 }
 
