@@ -228,3 +228,47 @@ describe('Mini App process generations', () => {
     }
   });
 });
+
+describe('Mini App ownership before spawn', () => {
+  it('refuses a Mini App another client owns, without spawning a process', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp owned '));
+    const build = (child: ScriptedChild) =>
+      createMiniAppNodeRuntimeAdapter({
+        resolvePluginDataDir: () => dataDir,
+        verifyCandidate: async () => true,
+        materializePackage: async ({ targetRoot }) => {
+          const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+          await mkdir(dirname(target), { recursive: true });
+          await writeFile(target, 'export const start = async () => undefined;\n');
+        },
+        isPortReserved: () => false,
+        ownerClient: 'webui',
+        spawn: () => child as unknown as ChildProcess,
+        createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+      });
+
+    const owner = new ScriptedChild(() => undefined);
+    const runtime = await build(owner).prepare({
+      candidate: candidate(),
+      processGeneration: 'generation-1',
+      signal: new AbortController().signal,
+      onLog: () => undefined,
+    });
+    try {
+      const second = new ScriptedChild(() => undefined);
+      await expect(
+        build(second).prepare({
+          candidate: candidate(),
+          processGeneration: 'generation-2',
+          signal: new AbortController().signal,
+          onLog: () => undefined,
+        }),
+      ).rejects.toMatchObject({ code: 'OWNED_ELSEWHERE' });
+      // The refusal happened before any spawn, so the second client never reached a process.
+      expect(second.received).toHaveLength(0);
+    } finally {
+      await runtime.stop();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+});

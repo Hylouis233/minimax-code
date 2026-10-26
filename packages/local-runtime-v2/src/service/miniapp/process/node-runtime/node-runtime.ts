@@ -20,6 +20,7 @@ import { MiniAppCleanupUnprovenError, markMiniAppRootTerminationProven } from '.
 import { sanitizeMiniAppRuntimeLogEvent } from '../../runtime-log.js';
 import type { MiniAppRunnerInitMessage } from './host-runner.js';
 import { waitForLoopbackReadiness } from './loopback-readiness.js';
+import { acquireMiniAppOwner, type MiniAppOwnerIdentity } from './owner-lease.js';
 import {
   createDirectNodeRootTerminator,
   type DirectNodeRootTerminator,
@@ -86,6 +87,8 @@ interface NodeRuntimeOptions {
   readonly resolveRealPath?: (target: string) => Promise<string>;
   readonly makeStartupToken?: () => string;
   readonly makeLoopbackToken?: () => string;
+  /** Label this client records when it takes ownership of a Mini App. */
+  readonly ownerClient?: string;
   readonly nowMs?: () => number;
   readonly wait?: (ms: number, signal: AbortSignal) => Promise<void>;
   readonly runnerStartTimeoutMs?: number;
@@ -115,6 +118,7 @@ type ResolvedOptions = Required<
     | 'resolveRealPath'
     | 'makeStartupToken'
     | 'makeLoopbackToken'
+    | 'ownerClient'
     | 'nowMs'
     | 'wait'
     | 'runnerStartTimeoutMs'
@@ -227,6 +231,38 @@ async function prepareRuntime(input: {
   readonly dataDir: string;
   readonly runtimeDir: string;
 }): Promise<MiniAppNodeRuntime> {
+  // Ownership is taken before the port loop and before any spawn: a second client must never reach
+  // the point of starting a process over the same plugin data.
+  const ownership = await acquireMiniAppOwner({
+    pluginDataDir: input.dataDir,
+    pluginId: input.candidate.pluginId,
+    identity: { client: input.options.ownerClient },
+    nowMs: input.options.nowMs,
+  });
+  if (ownership.kind === 'held') {
+    throw new MiniAppNodeRuntimeError(
+      'OWNED_ELSEWHERE',
+      ownerHeldDetail(ownership.owner, input.candidate.pluginId),
+    );
+  }
+  try {
+    return await preparedRuntimeWithOwnership(input, ownership);
+  } catch (error) {
+    await ownership.release();
+    throw error;
+  }
+}
+
+function ownerHeldDetail(owner: MiniAppOwnerIdentity | undefined, pluginId: string): string {
+  return owner
+    ? `Mini App ${pluginId} is already running in ${owner.client} (pid ${owner.pid})`
+    : `Mini App ${pluginId} is already running in another client`;
+}
+
+async function preparedRuntimeWithOwnership(
+  input: Parameters<typeof prepareRuntime>[0],
+  ownership: { release(): Promise<void> },
+): Promise<MiniAppNodeRuntime> {
   // One credential per process generation: every port attempt reuses it.
   const loopbackToken = input.options.makeLoopbackToken();
   let lastError: unknown;
@@ -265,6 +301,7 @@ async function prepareRuntime(input: {
         port,
         reservation,
         loopbackToken,
+        ownership,
       });
     } catch (error) {
       const failure = await selectFailureAfterCleanup(error, () =>
@@ -626,6 +663,7 @@ function preparedRuntime(
     readonly port: number;
     readonly reservation?: { release(): void };
     readonly loopbackToken: string;
+    readonly ownership: { release(): Promise<void> };
   },
 ): MiniAppNodeRuntime {
   let stopPromise: Promise<{ readonly proven: boolean }> | undefined;
@@ -658,6 +696,11 @@ function preparedRuntime(
         await removeRuntimeDir();
       } catch (removeError) {
         postStopErrors.push(removeError);
+      }
+      try {
+        await input.ownership.release();
+      } catch (releaseError) {
+        postStopErrors.push(releaseError);
       }
       throwPostStopErrors(postStopErrors);
       return { proven: true };
@@ -769,6 +812,7 @@ function resolveOptions(options: NodeRuntimeOptions): ResolvedOptions {
     resolveRealPath: realpath,
     makeStartupToken: randomUUID,
     makeLoopbackToken: () => randomBytes(32).toString('base64url'),
+    ownerClient: 'unknown',
     nowMs: Date.now,
     wait: defaultWait,
     runnerStartTimeoutMs: 10_000,
