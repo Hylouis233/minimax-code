@@ -535,18 +535,25 @@ _Avoid_: mini program, app, widget
 
 **Mini App view**:
 The client area that renders a Mini App's page. It is either a view inside the workspace panel or
-the whole content of a browser tab opened for one Mini App.
+the whole content of a browser tab opened for one Mini App. Both are the client's choice: a Mini App
+page cannot ask to be shown, moved or detached.
 _Avoid_: surface (that word names a client identity here), pane, frame
 
 **Mini App bridge**:
 The page-facing API a Mini App page uses to call the client hosting it: appending a draft to the
-composer, running or answering an agent turn, and reading the host's window state.
+composer, and running or answering an agent turn. Presentation is not part of it.
 _Avoid_: API, interface, plugin API
 
 **Mini App process**:
 The local process that serves one Mini App's page on a loopback port. The client hosts its output
 and does not own its state.
 _Avoid_: runtime (that names the harness side), server, container
+
+**Mini App presentation lease**:
+The record of which client document is currently showing one Mini App, held by the service because
+two presentations of the same Mini App are two documents that share nothing but that service. It is
+released when the document's connection closes.
+_Avoid_: session, tab state, presence
 
 ### Runtime ownership
 
