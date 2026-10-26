@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readOptionalMiniAppContribution } from './reader.js';
+import { readOptionalMiniAppContribution } from '../../../src/service/plugin-system/plugin/package/miniapp/reader.js';
 
 const roots: string[] = [];
 
