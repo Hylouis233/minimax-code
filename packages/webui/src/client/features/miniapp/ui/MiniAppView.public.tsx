@@ -105,30 +105,41 @@ export function MiniAppView({
    */
   const detached = !standalone && row?.detached === true;
   const frameRef = useRef<HTMLIFrameElement>(null);
-  /** Whether this mount has already asked for the view. A retry is a person's. */
-  const asked = useRef(false);
 
   /**
-   * The first show starts the Mini App — that is what opening a tab means.
+   * Present the Mini App here, or wait for the standalone tab that holds it.
    *
-   * Only the first: a presentation that was cleared stays cleared until the
-   * person presses the button, so a refusal cannot turn into a retry loop. The
-   * catalogue is read first, because a standalone tab may already be presenting
-   * this Mini App, and starting a second presentation of it is exactly what the
-   * person is told is not happening.
+   * The first ask starts it — that is what opening a tab means — and every later
+   * ask is one catalogue read, because the only event that says the tab closed is
+   * the record itself. `presentInline` refuses to restart a refused or stopped
+   * Mini App, so this loop cannot turn into a retry the person did not ask for.
+   *
+   * The standalone surface never waits: it *is* the presentation, so the lease the
+   * catalogue reports is its own.
    */
   useEffect(() => {
-    if (!workflows || presentation !== undefined || asked.current) return;
-    asked.current = true;
-    void (async () => {
-      if (!row) await workflows.loadListing();
-      const known = workflows
-        .getSnapshot()
-        .listing.rows.find((candidate) => candidate.pluginId === pluginId);
-      if (!standalone && known?.detached === true) return;
-      await workflows.open(pluginId);
-    })();
-  }, [pluginId, presentation, row, standalone, workflows]);
+    if (!workflows || presentation !== undefined) return;
+    if (standalone) {
+      void workflows.open(pluginId);
+      return;
+    }
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const ask = async (): Promise<void> => {
+      const outcome = await workflows.presentInline(pluginId).catch(() => "waiting" as const);
+      if (stopped) return;
+      if (outcome !== "waiting") {
+        if (timer !== undefined) clearInterval(timer);
+        return;
+      }
+      timer ??= setInterval(() => void ask(), PRESENTATION_SYNC_MS);
+    };
+    void ask();
+    return () => {
+      stopped = true;
+      if (timer !== undefined) clearInterval(timer);
+    };
+  }, [pluginId, presentation, standalone, workflows]);
 
   /** While a view is up, the runtime is asked whether it still is. */
   useEffect(() => {

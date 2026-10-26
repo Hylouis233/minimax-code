@@ -445,3 +445,111 @@ describe("the proxy registry", () => {
     await new Promise<void>((resolve) => upstream.close(() => resolve()));
   });
 });
+
+/**
+ * Review finding F1: an inline view mounted while a standalone tab holds the lease.
+ *
+ * The surface was rendered with `detached: true` and no local presentation, so the
+ * mount declined to start anything. When that tab closes, nothing reads the
+ * catalogue for this view: the open-presentation poll needs a local `open`, and
+ * `syncPresentations` returns without a read when the client holds none. The
+ * notice therefore outlives the lease.
+ */
+describe("a detached view whose standalone tab goes away", () => {
+  const PLUGIN = "dashboard";
+  const SESSION = "session-1";
+
+  function leasePort(input: { readonly detached: () => boolean }) {
+    let opens = 0;
+    const port: WebuiMiniAppPortSlice = {
+      listMiniApps: async () => ({
+        miniApps: [summary(PLUGIN, "running", {}, { detached: input.detached(), presentationRevision: 1 })],
+      }),
+      openMiniApp: async ({ pluginId }) => {
+        opens += 1;
+        return { pluginId, viewUrl: "http://127.0.0.1:49152" };
+      },
+      stopMiniApp: async () => ({ success: true as const }),
+    };
+    return { port, opens: () => opens };
+  }
+
+  function renderInline(workflows: ReturnType<typeof createWebuiMiniAppWorkflows>): string {
+    return render(
+      createElement(MiniAppView, { pluginId: PLUGIN, sessionId: SESSION }),
+      workflows,
+    );
+  }
+
+  it("clears the notice and presents the Mini App again once the lease is released", async () => {
+    let detached = true;
+    const { port, opens } = leasePort({ detached: () => detached });
+    const workflows = createWebuiMiniAppWorkflows({ port });
+
+    // The mount's own read: another document is presenting this Mini App.
+    await workflows.loadListing();
+    const waiting = renderInline(workflows);
+    expect(waiting).toContain('data-testid="miniapp-view-detached"');
+    expect(waiting).not.toContain("miniapp-view-frame");
+    expect(opens()).toBe(0);
+
+    // The standalone tab closes. Its socket is gone, so the record is released.
+    detached = false;
+    // The view holds no presentation of its own, so `syncPresentations` has
+    // nothing to reconcile: this is the read the mount still owed, and the stale
+    // row is why the notice used to outlive the lease.
+    await workflows.syncPresentations();
+    expect(workflows.getSnapshot().listing.rows[0]?.detached).toBe(true);
+    const stale = renderInline(workflows);
+    expect(stale).toContain('data-testid="miniapp-view-detached"');
+    expect(stale).not.toContain("miniapp-view-frame");
+
+    expect(await workflows.presentInline(PLUGIN)).toBe("presented");
+
+    const resumed = renderInline(workflows);
+    expect(resumed).not.toContain('data-testid="miniapp-view-detached"');
+    expect(resumed).not.toContain('data-detached="true"');
+    expect(resumed).toContain('data-testid="miniapp-view-frame"');
+    expect(workflows.getSnapshot().listing.rows[0]?.detached).toBe(false);
+    expect(workflows.getSnapshot().presentations[PLUGIN]?.kind).toBe("open");
+    expect(opens()).toBe(1);
+  });
+
+  it("does not restart a refused or stopped Mini App while it waits", async () => {
+    // The loop asks repeatedly, so the refusal/stop rule has to live in the owner
+    // rather than in the component's memory: a person restarts these, not a timer.
+    const refused = createWebuiMiniAppWorkflows({
+      port: {
+        listMiniApps: async () => ({
+          miniApps: [summary(PLUGIN, "stopped", {}, { detached: false, presentationRevision: 0 })],
+        }),
+        openMiniApp: async () => {
+          throw Object.assign(new Error("Mini App surface action failed"), { code: "BUSY" });
+        },
+        stopMiniApp: async () => ({ success: true as const }),
+      },
+    });
+    expect(await refused.presentInline(PLUGIN)).toBe("blocked");
+    expect(await refused.presentInline(PLUGIN)).toBe("blocked");
+
+    let stops = 0;
+    const stopped = createWebuiMiniAppWorkflows({
+      port: {
+        listMiniApps: async () => ({
+          miniApps: [summary(PLUGIN, "running", {}, { detached: false, presentationRevision: 1 })],
+        }),
+        openMiniApp: async ({ pluginId }) => ({ pluginId, viewUrl: "http://127.0.0.1:49152" }),
+        stopMiniApp: async () => {
+          stops += 1;
+          return { success: true as const };
+        },
+      },
+    });
+    await stopped.open(PLUGIN);
+    await stopped.stop(PLUGIN);
+    expect(stops).toBe(1);
+    // Stopped by the person: the loop must not bring it back.
+    expect(await stopped.presentInline(PLUGIN)).toBe("blocked");
+    expect(stopped.getSnapshot().presentations[PLUGIN]?.kind).toBe("stopped");
+  });
+});

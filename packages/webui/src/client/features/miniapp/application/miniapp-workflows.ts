@@ -163,6 +163,26 @@ export interface WebuiMiniAppWorkflows {
   readonly syncPresentations: () => Promise<void>;
 
   /**
+   * Present this Mini App inline, or wait for the standalone tab that holds it.
+   *
+   * The result is what the caller's loop does next:
+   *
+   *   * `"presented"` — this client now frames it (or already did), so stop asking.
+   *   * `"waiting"` — a standalone presentation is live, or the catalogue could not
+   *     be read. Ask again: the lease ends when that tab closes, and a fresh read
+   *     is the only thing that notices.
+   *   * `"blocked"` — a start was refused or the app was stopped. Restarting either
+   *     is the person's act, never a timer's.
+   *
+   * Always a fresh catalogue read, which is the point: a view mounted while another
+   * document holds the presentation has no presentation of its own for
+   * `syncPresentations` to reconcile.
+   */
+  readonly presentInline: (
+    pluginId: string,
+  ) => Promise<"presented" | "waiting" | "blocked">;
+
+  /**
    * The standalone page for one Mini App, or `undefined` when the host does not
    * wire the route.
    *
@@ -392,6 +412,37 @@ export function createWebuiMiniAppWorkflows(deps: {
     );
   };
 
+  /**
+   * Present here unless another document holds it, and keep asking while it does.
+   *
+   * The read is the mechanism, not an optimisation: the standalone lease is
+   * recorded by the service and released when that tab's socket closes, so a fresh
+   * catalogue read is the only way this document can learn it is free again.
+   */
+  const presentInline = async (
+    pluginId: string,
+  ): Promise<"presented" | "waiting" | "blocked"> => {
+    if (!available) return "blocked";
+    const current = state;
+    const existing = current.presentations[pluginId];
+    if (existing?.kind === "open" || existing?.kind === "opening") return "presented";
+    // A cleared presentation or a refusal is the person's to retry, never a timer's.
+    if (existing?.kind === "stopped" || current.refusals[pluginId] !== undefined) return "blocked";
+    let catalogue: WebuiMiniAppCatalogue | undefined;
+    try {
+      catalogue = await readCatalogue();
+    } catch {
+      // A read that failed says nothing about the lease, and starting on a guess
+      // could present a Mini App another tab is already showing. Ask again.
+      return "waiting";
+    }
+    const row = (catalogue?.miniApps ?? state.listing.rows).find(
+      (candidate) => candidate.pluginId === pluginId,
+    );
+    if (row?.detached === true) return "waiting";
+    return (await open(pluginId)) ? "presented" : "blocked";
+  };
+
   const mutatePlugin = async (
     action: "enablePlugin" | "disablePlugin" | "uninstallPlugin",
     pluginId: string,
@@ -419,6 +470,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     open,
     stop,
     syncPresentations,
+    presentInline,
     standaloneUrl,
     claimStandalone,
     setPluginEnabled: (pluginId, enabled) =>
