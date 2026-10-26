@@ -148,6 +148,28 @@ describe('Mini App proxy', () => {
     expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
   });
 
+  it('keeps one plugin on the same port across a restart, so the page storage survives', async () => {
+    const derived = deriveMiniAppProxyPort('fixture.miniapp');
+    const target = {
+      pluginId: 'fixture.miniapp',
+      upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+      credential: CREDENTIAL,
+      credentialHeader: CREDENTIAL_HEADER,
+    };
+
+    const first = await startMiniAppProxy({ target, port: derived });
+    const firstUrl = first.viewUrl;
+    await first.close();
+
+    const second = await startMiniAppProxy({ target, port: deriveMiniAppProxyPort('fixture.miniapp') });
+    try {
+      expect(second.viewUrl).toBe(firstUrl);
+      expect(second.port).toBe(derived);
+    } finally {
+      await second.close();
+    }
+  });
+
   it('derives a stable loopback port per plugin', () => {
     const first = deriveMiniAppProxyPort('fixture.miniapp');
 
