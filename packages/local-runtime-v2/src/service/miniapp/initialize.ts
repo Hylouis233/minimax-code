@@ -1,5 +1,6 @@
 import type { AppDb } from '../../infra/db/client.js';
 import type { HostProcessConnectorGateway } from '../host-connector-system/index.js';
+import type { MiniAppAgentGateway } from './agent/contracts.js';
 import { HostMiniAppPortRegistry } from './process/node-runtime/port-registry.js';
 import { DrizzleMiniAppStateStore } from './supervisor/state.repository.js';
 import type { MiniAppCandidate, MiniAppSupervisor } from './contracts.js';
@@ -10,6 +11,8 @@ import { DefaultMiniAppSupervisor } from './supervisor/supervisor.js';
 export interface InitializeMiniAppSupervisorOptions {
   readonly db: AppDb;
   readonly connectorGateway: HostProcessConnectorGateway;
+  /** The runtime's Agent gateway; the child IPC connector registers its arena against it. */
+  readonly agentGateway?: MiniAppAgentGateway;
   readonly verifyCandidate: (candidate: MiniAppCandidate) => Promise<boolean>;
   readonly materializePackage: (input: {
     readonly sourceRoot: string;
@@ -36,6 +39,7 @@ export function initializeMiniAppSupervisor(
     reservePort: (input) => ports.reserve(input),
     hostConnectorSessionFactory: createMiniAppHostConnectorSessionFactory({
       gateway: options.connectorGateway,
+      ...(options.agentGateway ? { agentGateway: options.agentGateway } : {}),
     }),
   });
   const supervisor = new DefaultMiniAppSupervisor({

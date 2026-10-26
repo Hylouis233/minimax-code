@@ -61,6 +61,7 @@ function initMessage(): MiniAppRunnerInitMessage {
     readiness: { startupToken: 'startup-token', nodeDigest: 'node-digest' },
     loopbackToken: TOKEN,
     hostConnectorPolicy: { kind: 'deny-all' },
+    agentPolicy: { kind: 'deny-all' },
   };
 }
 

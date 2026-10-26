@@ -1567,6 +1567,14 @@ describe("runtime services composition", () => {
       materializePackage: expect.any(Function),
       resolvePluginDataDir: expect.any(Function),
     });
+    // The child IPC connector registers its arena against this same gateway, so the Supervisor
+    // must receive the instance the runtime created rather than a second one.
+    expect(mocked.miniAppOptions?.["agentGateway"]).toMatchObject({
+      registerArena: expect.any(Function),
+      run: expect.any(Function),
+      reply: expect.any(Function),
+    });
+
     expect(mocked.events).toContain("plugin:attach-miniapp");
     expect(mocked.events.indexOf("plugin:attach-miniapp")).toBeLessThan(
       mocked.events.indexOf("turn:create"),

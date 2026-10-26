@@ -723,6 +723,7 @@ async function initializeRuntimeServiceOwners(
       dataDir: input.options.dataDir,
       nowMs: input.nowMs,
       plugin,
+      ...(miniAppAgent ? { agentGateway: miniAppAgent } : {}),
       readyOwners: input.readyOwners,
       closeOwners: input.closeOwners,
     });

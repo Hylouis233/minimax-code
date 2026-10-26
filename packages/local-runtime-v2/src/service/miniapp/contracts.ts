@@ -86,15 +86,16 @@ export interface MiniAppHostConnectorSession {
   close(): Promise<void>;
 }
 
-export interface MiniAppHostConnectorReadable {
-  on(event: 'data' | 'end' | 'error', listener: (...args: unknown[]) => void): unknown;
-  removeListener(event: string, listener: (...args: unknown[]) => void): unknown;
+/** One message on the parent/child IPC channel; lifecycle frames carry their own `type`. */
+export interface MiniAppIpcMessage {
+  readonly type: 'miniapp:connector';
+  readonly payload: unknown;
 }
 
-export interface MiniAppHostConnectorWritable {
-  readonly destroyed?: boolean;
-  write(chunk: Buffer): boolean;
-  once(event: 'drain' | 'error' | 'close', listener: (...args: unknown[]) => void): unknown;
+export interface MiniAppIpcTransport {
+  readonly connected?: boolean;
+  send(message: MiniAppIpcMessage, callback: (error: Error | null) => void): boolean;
+  on(event: 'message' | 'disconnect' | 'error', listener: (...args: unknown[]) => void): unknown;
   removeListener(event: string, listener: (...args: unknown[]) => void): unknown;
 }
 
@@ -103,8 +104,10 @@ export interface MiniAppHostConnectorSessionFactory {
     readonly pluginId: string;
     readonly processGeneration: string;
     readonly providers: readonly string[];
-    readonly request: MiniAppHostConnectorReadable;
-    readonly response: MiniAppHostConnectorWritable;
+    /** Missing is treated as deny-all; the child then receives no `agent` context. */
+    readonly agentPolicy?: MiniAppAgentPolicy;
+    /** The parent/child IPC channel, shared with lifecycle frames and told apart by `type`. */
+    readonly transport: MiniAppIpcTransport;
     readonly onFatal: (error: Error) => void;
   }): MiniAppHostConnectorSession;
 }

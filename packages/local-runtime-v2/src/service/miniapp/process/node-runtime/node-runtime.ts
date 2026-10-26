@@ -363,6 +363,7 @@ async function spawnAttempt(
     },
     loopbackToken,
     hostConnectorPolicy: input.candidate.hostConnectorPolicy,
+    agentPolicy: input.candidate.agentPolicy ?? { kind: 'deny-all' },
   };
   const physicalRoot = input.physicalRoots.acquire(input.candidate.pluginId);
   let child: ChildProcess;
@@ -373,7 +374,7 @@ async function spawnAttempt(
       windowsHide: true,
       shell: false,
       env: runnerEnvironment(input.options.env),
-      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
   } catch (error) {
     physicalRoot.release();
@@ -405,7 +406,6 @@ async function spawnAttempt(
     processGeneration: input.processGeneration,
     onLog: input.onLog,
     fatal,
-    connectorEnabled: Boolean(connector),
   });
   let shutdownRequested = false;
   let resolveClosed: (exit: MiniAppRuntimeExit) => void = () => undefined;
@@ -533,19 +533,20 @@ function createConnectorSession(
   child: ChildProcess,
   fatal: AbortController,
 ): MiniAppHostConnectorSession | undefined {
-  if (input.candidate.hostConnectorPolicy.kind !== 'allowlist') return undefined;
-  if (!child.stdout || !child.stdin || !input.options.hostConnectorSessionFactory) {
+  const { hostConnectorPolicy, agentPolicy } = input.candidate;
+  if (!needsConnectorChannel(input.candidate)) return undefined;
+  if (!child.send || child.connected === false || !input.options.hostConnectorSessionFactory) {
     throw new MiniAppNodeRuntimeError(
       'HOST_CONNECTOR_UNAVAILABLE',
-      'Host Connector stdio or session factory is unavailable',
+      'Host Connector IPC or session factory is unavailable',
     );
   }
   return input.options.hostConnectorSessionFactory.create({
     pluginId: input.candidate.pluginId,
     processGeneration: input.processGeneration,
-    providers: input.candidate.hostConnectorPolicy.providers,
-    request: child.stdout,
-    response: child.stdin,
+    providers: hostConnectorPolicy.kind === 'allowlist' ? hostConnectorPolicy.providers : [],
+    ...(agentPolicy ? { agentPolicy } : {}),
+    transport: child,
     onFatal: (error) => fatal.abort(error),
   });
 }
@@ -556,7 +557,6 @@ function captureChildLogs(
     readonly processGeneration: string;
     readonly onLog: Parameters<MiniAppNodeRuntimeFactory['prepare']>[0]['onLog'];
     readonly fatal: AbortController;
-    readonly connectorEnabled: boolean;
   },
 ): void {
   child.on('message', (raw: unknown) => {
@@ -577,28 +577,31 @@ function captureChildLogs(
       }),
     );
   });
-  child.stderr?.on('data', (chunk: Buffer | string) => {
+  // stdout and stderr are the plugin's own logs: bounded, sanitized, and never protocol input.
+  let logWindowStartedAt = Date.now();
+  let remainingLogBytes = 64 * 1024;
+  const captureStreamLog = (level: 'info' | 'error', chunk: Buffer | string) => {
+    const now = Date.now();
+    if (now - logWindowStartedAt >= 1_000) {
+      logWindowStartedAt = now;
+      remainingLogBytes = 64 * 1024;
+    }
+    if (remainingLogBytes <= 0) return;
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const accepted = bytes.subarray(0, Math.min(4 * 1024, remainingLogBytes));
+    remainingLogBytes -= accepted.byteLength;
     options.onLog(
       sanitizeMiniAppRuntimeLogEvent({
         processGeneration: options.processGeneration,
-        level: 'error',
-        message: bytes.toString('utf8').trim(),
+        level,
+        message: accepted.toString('utf8').trim(),
         byteLength: bytes.byteLength,
         fieldKeys: [],
       }),
     );
-  });
-  if (!options.connectorEnabled) {
-    child.stdout?.once('data', () => {
-      options.fatal.abort(
-        new MiniAppNodeRuntimeError(
-          'HOST_CONNECTOR_PROTOCOL_VIOLATION',
-          'Mini App wrote to reserved stdout',
-        ),
-      );
-    });
-  }
+  };
+  child.stderr?.on('data', (chunk: Buffer | string) => captureStreamLog('error', chunk));
+  child.stdout?.on('data', (chunk: Buffer | string) => captureStreamLog('info', chunk));
 }
 
 function waitForStarted(attempt: Attempt, signal: AbortSignal, timeoutMs: number): Promise<void> {
@@ -834,7 +837,7 @@ function resolveOptions(options: NodeRuntimeOptions): ResolvedOptions {
 }
 
 function assertCapabilities(options: ResolvedOptions, candidate: ProcessMiniAppCandidate): void {
-  if (candidate.hostConnectorPolicy.kind === 'allowlist' && !options.hostConnectorSessionFactory) {
+  if (needsConnectorChannel(candidate) && !options.hostConnectorSessionFactory) {
     throw new MiniAppNodeRuntimeError(
       'HOST_CONNECTOR_UNAVAILABLE',
       'Host Connector session is unavailable',
@@ -851,6 +854,14 @@ async function resolveDataDir(options: ResolvedOptions, pluginId: string): Promi
     );
   await options.ensureDirectory(requested);
   return options.resolveRealPath(requested);
+}
+
+/** Connector and Agent access share one `miniapp:connector` IPC session. */
+function needsConnectorChannel(candidate: ProcessMiniAppCandidate): boolean {
+  return (
+    candidate.hostConnectorPolicy.kind === 'allowlist' ||
+    candidate.agentPolicy?.kind === 'allowlist'
+  );
 }
 
 function candidatePort(input: Parameters<typeof prepareRuntime>[0], index: number): number {
