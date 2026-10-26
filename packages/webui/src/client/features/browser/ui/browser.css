@@ -50,8 +50,8 @@
     width: 28px;
     height: 28px;
     flex: 0 0 28px;
-    align-items: stretch;
-    justify-content: stretch;
+    align-items: center;
+    justify-content: center;
     padding: 0;
     border: 0;
     border-radius: 6px;
@@ -63,6 +63,12 @@
   .webui-browser-toolbar-command:hover {
     background: var(--bg_interaction_tertiary_hover);
     color: var(--text_default_primary);
+  }
+
+  .webui-browser-toolbar-command:disabled {
+    background: transparent;
+    color: var(--icon_default_tertiary, #a0a6b0);
+    cursor: default;
   }
 
   .webui-browser-toolbar-command:focus-visible {
@@ -87,17 +93,30 @@
     box-shadow: inset 0 0 0 1px var(--border_default);
   }
 
+  .webui-browser-omnibox:focus-within {
+    box-shadow: inset 0 0 0 1px var(--icon_default_accent);
+  }
+
   .webui-browser-omnibox-glyph {
     color: var(--icon_default_tertiary, #a0a6b0);
   }
 
   .webui-browser-omnibox-url {
     min-width: 0;
+    flex: 1 1 auto;
     overflow: hidden;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    padding: 0;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--font-size_12, 12px);
     color: var(--text_default_secondary);
+  }
+
+  .webui-browser-omnibox-url:disabled {
+    cursor: default;
   }
 
   /* The page the Agent is on. A real browser has one person and one page, so

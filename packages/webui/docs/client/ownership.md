@@ -133,7 +133,8 @@ proposing to move this state to the server.
   writes panel state through `stateFor(sessionId)` and `dispatch(sessionId, …)`, so a tab opened in
   one session is not in another's. A tab is a stable slot whose content can be replaced in place, and
   the URL box exists only inside the new tab page — a web tab carries a toolbar (back, forward,
-  reload, the URL read-only) instead. The run's selection and the tab the person is looking at are two
+  reload, home to its launcher, and the URL read-only) instead. Back and forward are disabled when
+  their corresponding history entry is absent. The run's selection and the tab the person is looking at are two
   cells with one writer each, with one bootstrap: a person who opens a web tab while the run has no
   selection gives the run that page, decided by the runtime at the moment the page appears
   (`WebuiBrowserTabOpener` — `runtime/browser/browser-service.ts` — `openWebTab`). A tab is a stable

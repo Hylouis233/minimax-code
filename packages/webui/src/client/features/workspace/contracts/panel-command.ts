@@ -40,7 +40,7 @@ export type WorkspacePanelCommand =
    * against whatever tab is already bound, and opens a tab of its own for a
    * page nothing is showing yet.
    */
-  | { readonly type: "open-web-tab"; readonly target: WebuiBrowserTargetId; readonly title: string; readonly url: string; readonly faviconUrl?: string; readonly tabId?: string }
+  | { readonly type: "open-web-tab"; readonly target: WebuiBrowserTargetId; readonly title: string; readonly url: string; readonly faviconUrl?: string; readonly canGoBack?: boolean; readonly canGoForward?: boolean; readonly tabId?: string }
   /**
    * Opens one of the tool views, as the new tab page's tiles do.
    *
@@ -69,6 +69,8 @@ export type WorkspacePanelCommand =
    * box left.
    */
   | { readonly type: "open-new-tab" }
+  /** Return the named web tab to its new-tab launcher without creating another tab. */
+  | { readonly type: "return-web-tab-to-launcher"; readonly tabId: string }
   /** Open the panel, creating its first launcher only when it has no tabs. */
   | { readonly type: "open-panel" }
   | { readonly type: "select-tab"; readonly tabId: string }

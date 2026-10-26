@@ -196,6 +196,10 @@ export interface WebuiBrowserTargetState {
   readonly status: WebuiBrowserTargetStatus;
   /** Whether this target is the one the panel is currently showing. */
   readonly selected: boolean;
+  /** Whether the page has a previous entry in its navigation history. */
+  readonly canGoBack?: boolean;
+  /** Whether the page has a next entry in its navigation history. */
+  readonly canGoForward?: boolean;
 }
 
 /** Every target the host knows about for one surface. */
@@ -230,6 +234,10 @@ export interface WebuiBrowserWebTab {
   readonly faviconUrl?: string;
   /** Whether this web tab is the run's selection. */
   readonly selected: boolean;
+  /** Whether the page has a previous entry in its navigation history. */
+  readonly canGoBack?: boolean;
+  /** Whether the page has a next entry in its navigation history. */
+  readonly canGoForward?: boolean;
 }
 
 /**

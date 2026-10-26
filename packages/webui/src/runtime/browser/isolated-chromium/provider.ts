@@ -521,6 +521,20 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
       // generation here — and cannot be driven either, so the number is only
       // ever read as the first one.
       const page = this.#pageOf(info.targetId);
+      let canGoBack = false;
+      let canGoForward = false;
+      if (page) {
+        try {
+          const history = await connection.send<{
+            currentIndex: number;
+            entries: readonly unknown[];
+          }>("Page.getNavigationHistory", {}, page.sessionId, { timeoutMs: 1_500 });
+          canGoBack = history.currentIndex > 0;
+          canGoForward = history.currentIndex < history.entries.length - 1;
+        } catch {
+          // The page may navigate or close while its navigation history is read.
+        }
+      }
       if (page && page.faviconUrlFor !== info.url && /^https?:/u.test(info.url)) {
         try {
           const favicon = await connection.send<{ result?: { value?: unknown } }>(
@@ -554,6 +568,8 @@ export class WebuiIsolatedChromiumProvider implements WebuiBrowserSurfaceProvide
         ...(page?.faviconUrl ? { faviconUrl: page.faviconUrl } : {}),
         status: "open",
         selected: info.targetId === this.#launchTargetId,
+        canGoBack,
+        canGoForward,
       });
     }
     return states;

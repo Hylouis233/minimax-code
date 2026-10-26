@@ -79,29 +79,34 @@ function recordingSend(): {
 }
 
 describe("a web tab's toolbar", () => {
-  it("carries back, forward, reload and the url", () => {
+  it("carries back, forward, reload, home and the url", () => {
     const markup = renderToStaticMarkup(
-      <BrowserPanelHost target={PAGE} url="https://example.com/one" />,
+      <BrowserPanelHost target={PAGE} url="https://example.com/one" canGoBack={false} canGoForward={false} />,
     );
 
     for (const command of WEBUI_BROWSER_TOOLBAR_COMMANDS) {
       expect(markup).toContain(`data-testid="browser-toolbar-${command}"`);
     }
+    expect(markup).toContain('data-testid="browser-toolbar-home"');
+    expect(markup).toContain('data-testid="browser-toolbar-back" disabled=""');
+    expect(markup).toContain('data-testid="browser-toolbar-forward" disabled=""');
     expect(markup).toContain('data-testid="browser-toolbar-url"');
     expect(markup).toContain("https://example.com/one");
   });
 
-  it("shows the url and never offers a field to type one into", () => {
+  it("shows an editable address field seeded with the current url", () => {
     const markup = renderToStaticMarkup(
       <BrowserPanelHost target={PAGE} url="https://example.com/one" />,
     );
     const toolbar = markup.slice(markup.indexOf('data-testid="browser-toolbar"'));
     const toolbarMarkup = toolbar.slice(0, toolbar.indexOf('data-testid="browser-panel"'));
 
-    // The url is a display. A person cannot type into a web tab: the address
-    // box belongs to the new tab page, and this row is the page's chrome.
+    // The current tab's address field submits a target-bound navigation.
     expect(toolbarMarkup).toContain("https://example.com/one");
-    expect(toolbarMarkup).not.toContain("<input");
+    const address = toolbarMarkup.match(/<input[^>]*data-testid="browser-toolbar-url"[^>]*>/)?.[0];
+    expect(address).toContain('type="text"');
+    expect(address).toContain('value="https://example.com/one"');
+    expect(address).not.toContain("disabled");
     expect(toolbarMarkup).not.toContain("<textarea");
     expect(toolbarMarkup).not.toContain("contenteditable");
     expect(toolbarMarkup).not.toContain("data-testid=\"webui-workspace-launcher-url\"");
@@ -134,9 +139,9 @@ describe("a web tab's toolbar", () => {
     // The toolbar is rendered by the host the strip mounts, and the strip hands
     // it the tab's own target and url — so the row and the frame describe the
     // same page rather than a pair that has drifted.
-    expect(WORKSPACE_PANELS_SOURCE).toContain(
-      "<BrowserPanelHost target={activeTab.content.target} url={activeTab.content.url} />",
-    );
+    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoBack={activeTab.content.canGoBack}");
+    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoForward={activeTab.content.canGoForward}");
+    expect(WORKSPACE_PANELS_SOURCE).toContain('type: "return-web-tab-to-launcher"');
   });
 
   it("reloads the target list when the viewed tab or its page generation changes", () => {

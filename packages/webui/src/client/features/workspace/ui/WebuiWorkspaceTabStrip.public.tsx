@@ -37,6 +37,7 @@ import {
   type WebuiBrowserWebTab,
   type WebuiBrowserWebTabSnapshot,
 } from "../../../../shared/contracts/browser.js";
+import { webuiBrowserAddressUrl } from "../../browser/ui/BrowserPanelHost.public.js";
 import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import {
   webuiWorkspaceLauncherTiles,
@@ -62,9 +63,9 @@ const STRIP_COPY = {
   addTab: "新建标签页",
   fileClose: "关闭",
   tabsLabel: "工作区面板标签",
-  launcherUrlLabel: "输入网址，打开为网页标签页",
-  launcherUrlPlaceholder: "输入网址",
-  launcherUrlSubmit: "打开网页",
+  launcherUrlLabel: "搜索 Google 或输入网址",
+  launcherUrlPlaceholder: "搜索 Google 或输入网址",
+  launcherUrlSubmit: "搜索或打开网页",
   launcherPending: "正在打开…",
   launcherUnavailable: "当前运行时没有浏览器能力，无法打开网页。",
 } as const;
@@ -132,6 +133,8 @@ export function webuiWorkspaceTabStripReconcile(
         current.title !== published.title ||
         current.url !== published.url ||
         current.faviconUrl !== published.faviconUrl ||
+        current.canGoBack !== published.canGoBack ||
+        current.canGoForward !== published.canGoForward ||
         current.target.generation !== published.target.generation
       );
     })
@@ -142,6 +145,8 @@ export function webuiWorkspaceTabStripReconcile(
         title: published.title,
         url: published.url,
         ...(published.faviconUrl ? { faviconUrl: published.faviconUrl } : {}),
+        ...(published.canGoBack !== undefined ? { canGoBack: published.canGoBack } : {}),
+        ...(published.canGoForward !== undefined ? { canGoForward: published.canGoForward } : {}),
       },
       target: published.target,
     }));
@@ -528,14 +533,11 @@ export async function webuiWorkspaceLauncherOpenPage(input: {
 /**
  * The url the browser is told to open.
  *
- * A person types a host as often as a scheme, and a bare host is not something
- * the browser can open — so the scheme is added here rather than answered with
- * an error page. Anything that already carries one is passed as typed.
+ * Explicit URLs and bare web addresses open directly. Other input is treated
+ * as a Google search query, so a single word does not become a broken host.
  */
 export function webuiWorkspaceLauncherUrl(input: string): string {
-  const trimmed = input.trim();
-  if (!trimmed) return "";
-  return /^[a-z][a-z0-9+.-]*:(?:\/\/|$)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return webuiBrowserAddressUrl(input);
 }
 
 /**

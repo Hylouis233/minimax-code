@@ -6,7 +6,7 @@ import {
   IconCalendarEvent, IconCaretRightFilled, IconChartBar, IconCheck, IconChevronDown, IconChevronLeft,
   IconChevronRight, IconClipboard, IconCode, IconCopy, IconDeviceMobile, IconDots,
   IconDownload, IconEdit, IconFile, IconFileCode, IconFolder, IconFolderPlus,
-  IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconLayoutDashboard, IconMaximize,
+  IconGitBranch, IconGitCompare, IconGitFork, IconHierarchy, IconHome, IconLayoutDashboard, IconMaximize,
   IconLayoutSidebar, IconMapPin, IconMessage, IconMessageCircle, IconMessageQuestion,
   IconMinimize, IconPaperclip, IconPin, IconPinFilled, IconPuzzle, IconRefresh, IconSearch,
   IconShieldCheck, IconShieldLock, IconShieldX, IconSparkles,
@@ -34,6 +34,7 @@ export function WebuiIconChevronRight({ className }: WebuiIconProps): ReactEleme
 export function WebuiIconClose({ className }: WebuiIconProps): ReactElement { return glyph(IconX, className, 16); }
 export function WebuiIconReload({ className }: WebuiIconProps): ReactElement { return glyph(IconRefresh, className, 16); }
 export function WebuiIconGlobe({ className }: WebuiIconProps): ReactElement { return glyph(IconWorld, className, 16); }
+export function WebuiIconHome({ className }: WebuiIconProps): ReactElement { return glyph(IconHome, className, 16); }
 
 /** Product mark. This custom MiniMax glyph is branding, not a UI icon. */
 export function WebuiIconBrand({ className }: WebuiIconProps): ReactElement {
