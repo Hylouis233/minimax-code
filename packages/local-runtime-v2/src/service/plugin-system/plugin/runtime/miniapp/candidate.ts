@@ -1,3 +1,5 @@
+import { MINIAPP_AGENT_DEFAULT_CONCURRENCY, type MiniAppAgentPolicy } from '../../../../miniapp/contracts.js';
+
 import { PluginSystemError } from '../../../errors.js';
 import type { RuntimeEligibleScannedReadPluginPackage } from '../../package/types.js';
 import type { PluginSnapshot } from '../snapshot-builder.js';
@@ -16,6 +18,8 @@ export interface PluginMiniAppCandidate {
   readonly hostConnectorPolicy:
     | { readonly kind: 'deny-all' }
     | { readonly kind: 'allowlist'; readonly providers: readonly string[] };
+  /** Derived from the parsed manifest's `agentAccess`; deny-all when it declares none. */
+  readonly agentPolicy?: MiniAppAgentPolicy;
 }
 
 export interface MiniAppDefinition {
@@ -105,6 +109,14 @@ export function miniAppCandidateFromPackage(packageEntry: {
     mcpEndpoints: miniapp.mcpEndpoints.map(({ server, path }) => ({ id: server, path })),
     hostConnectorPolicy: miniapp.hostConnectorAccess?.providers.length
       ? { kind: 'allowlist', providers: [...miniapp.hostConnectorAccess.providers] }
+      : { kind: 'deny-all' },
+    // An absent or empty list denies: a manifest that never asked for agent access admits none.
+    agentPolicy: miniapp.agentAccess?.length
+      ? {
+          kind: 'allowlist',
+          capabilities: [...miniapp.agentAccess],
+          maxConcurrent: miniapp.agentConcurrency ?? MINIAPP_AGENT_DEFAULT_CONCURRENCY,
+        }
       : { kind: 'deny-all' },
   };
 }

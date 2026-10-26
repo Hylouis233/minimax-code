@@ -13,3 +13,5 @@ export {
   type RuntimeMiniAppServiceOptions,
   type RuntimeMiniAppServices,
 } from './composition.js';
+
+export * from './agent/index.js';

@@ -24,6 +24,14 @@ import type {
   MutatePluginResult as MutatePluginResp,
 } from "@mavis/protocol/local";
 import type { MiniAppSurfaceSummary } from "@mavis/shared/miniapp-surface";
+import type {
+  MiniAppAgentAgents,
+  MiniAppAgentModels,
+  MiniAppAgentModelSelection,
+  MiniAppAgentPermissionDecision,
+  MiniAppAgentRunEvent,
+  MiniAppAgentRunResult,
+} from "../../service/miniapp/index.js";
 import type { SessionReportManifest } from "../../service/session-system/index.js";
 import type { WorkspaceReviewFileContent, WorkspaceReviewFileDiff, WorkspaceReviewSearchResult, WorkspaceReviewSummary } from "../../service/workspace/contracts.js";
 import type {
@@ -34,6 +42,13 @@ import type {
   UserModelInputView,
   UserModelProviderCandidateView,
 } from "../../service/model-system/index.js";
+
+/** Trusted tab identity the Host resolved for a Mini App Agent call; never page-supplied. */
+export interface ProcessLocalMiniAppAgentCaller {
+  readonly pluginId: string;
+  readonly runId: string;
+  readonly hostSessionId?: string;
+}
 
 export type ProcessLocalModelInput = Omit<UserModelInputView, "modalities"> & {
   modalities?: { input?: readonly string[]; output?: readonly string[] };
@@ -153,6 +168,62 @@ export interface LocalRuntimeApplication {
     stop(input: {
       readonly pluginId: string;
       readonly signal?: AbortSignal;
+    }): Promise<void>;
+  };
+  /**
+   * Page-path entry for the Mini App Agent API. The Host resolves `caller` from the tab that sent
+   * the request; the page payload never carries identity. `runId` is the launch `runId` (= process
+   * generation) and must match a registered arena; `hostSessionId` is the chat session the tab is
+   * bound to, when any.
+   */
+  readonly miniAppAgent?: {
+    run(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly text: string;
+      readonly sessionId?: string;
+      /** Only with a new session: the agent it is created for. */
+      readonly agent?: string;
+      /** Switches the session to this model before the turn. */
+      readonly model?: MiniAppAgentModelSelection;
+      readonly signal?: AbortSignal;
+      readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+    }): Promise<MiniAppAgentRunResult>;
+    models(input: { readonly caller: ProcessLocalMiniAppAgentCaller }): Promise<MiniAppAgentModels>;
+    agents(input: { readonly caller: ProcessLocalMiniAppAgentCaller }): Promise<MiniAppAgentAgents>;
+    /** Creates a session bound like a first `run` would, without running a turn. */
+    create(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly agent?: string;
+    }): Promise<{ readonly sessionId: string }>;
+    reply(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly sessionId: string;
+      readonly requestId: string;
+      readonly decision: MiniAppAgentPermissionDecision;
+    }): Promise<void>;
+    answer(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly sessionId: string;
+      readonly requestId: string;
+      readonly answers: readonly AskQuestionnaireReplyAnswer[];
+      /** Switches the session to this model before the continuation turn. */
+      readonly model?: MiniAppAgentModelSelection;
+      readonly signal?: AbortSignal;
+      readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+    }): Promise<MiniAppAgentRunResult>;
+    /** Ownership + host check for showing a Mini App session in the host chat's side panel. */
+    open(input: {
+      readonly caller: ProcessLocalMiniAppAgentCaller;
+      readonly sessionId: string;
+    }): Promise<{ readonly sessionId: string; readonly hostSessionId: string }>;
+    /** Host reports the side panel now shows / no longer shows a Mini App session (after its UI accepted). */
+    panelOpened(input: {
+      readonly sessionId: string;
+      readonly hostSessionId: string;
+    }): Promise<void>;
+    panelClosed(input: {
+      readonly sessionId: string;
+      readonly hostSessionId: string;
     }): Promise<void>;
   };
   readonly goals?: {

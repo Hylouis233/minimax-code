@@ -1,6 +1,23 @@
 /** Largest `agentConcurrency` a Mini App manifest may declare. */
 export const MINIAPP_AGENT_MAX_CONCURRENCY = 32;
 
+/** Runs of one plugin at once when its manifest omits `agentConcurrency`. */
+export const MINIAPP_AGENT_DEFAULT_CONCURRENCY = 4;
+
+type MiniAppAgentCapability = 'session.run';
+
+/**
+ * Derived from the parsed manifest's `agentAccess`; absent or empty means deny-all.
+ * `maxConcurrent` is the manifest's `agentConcurrency` (runs of this plugin at once).
+ */
+export type MiniAppAgentPolicy =
+  | { readonly kind: 'deny-all' }
+  | {
+      readonly kind: 'allowlist';
+      readonly capabilities: readonly MiniAppAgentCapability[];
+      readonly maxConcurrent: number;
+    };
+
 /** Every Mini App HTTP server answers this path from the guard, never from plugin code. */
 export const MINIAPP_LOOPBACK_HEALTH_PATH = '/__mavis/health';
 
@@ -28,6 +45,8 @@ export interface ProcessMiniAppCandidate extends MiniAppCandidateBase {
     readonly path: string;
   }[];
   readonly hostConnectorPolicy: MiniAppHostConnectorPolicy;
+  /** Optional so existing fixtures stay valid; missing is treated as deny-all. */
+  readonly agentPolicy?: MiniAppAgentPolicy;
 }
 
 /** Process-only package contract consumed by the PluginSystem composition layer. */
