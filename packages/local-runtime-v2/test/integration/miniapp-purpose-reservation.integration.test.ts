@@ -59,7 +59,10 @@ describe('Mini App session purpose reservation', () => {
           sessionType: 'root',
           purpose: 'miniapp:spoofed.plugin',
         }),
-      ).rejects.toThrow(/reserved for runtime-owned/i);
+      ).rejects.toMatchObject({
+        reason: 'purpose-reserved',
+        message: expect.stringMatching(/reserved for runtime-owned/i),
+      });
 
       // A reserved label with surrounding whitespace is the same claim.
       await expect(
@@ -69,7 +72,28 @@ describe('Mini App session purpose reservation', () => {
           sessionType: 'root',
           purpose: '  miniapp:spoofed.plugin',
         }),
-      ).rejects.toThrow(/reserved for runtime-owned/i);
+      ).rejects.toMatchObject({ reason: 'purpose-reserved' });
+    },
+    120_000,
+  );
+
+  it(
+    'refuses the same label on the non-root path that reuses internal session creation',
+    async () => {
+      const host = await bootHost();
+      const conversation = host.apiHost.runtimeConversation!;
+
+      // This is the branch that used to hand a caller's `purpose` to `createInternalSession`.
+      await expect(
+        conversation.lifecycle.createSession({
+          agentName: 'mavis',
+          sessionType: 'branch',
+          purpose: 'miniapp:spoofed.plugin',
+        }),
+      ).rejects.toMatchObject({
+        reason: 'purpose-reserved',
+        message: expect.stringMatching(/reserved for runtime-owned/i),
+      });
     },
     120_000,
   );
