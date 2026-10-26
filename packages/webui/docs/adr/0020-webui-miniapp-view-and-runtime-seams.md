@@ -120,7 +120,10 @@ What the borrowing brings:
   run on both sides of the boundary.
 
 What the borrowing leaves behind is the window block: the argv surface id, the `surface.window`
-manifest whitelist, and the page's `getState`/`update`/`focus` handle. It is the last contiguous
+manifest whitelist, and the window state and patch contracts that the page's
+`window.mcode.miniapp.window` handle (`getState`, `update`, `focus`, defined in the preload rather than
+here) is built on — `MINIAPP_SURFACE_ID_ARGUMENT_PREFIX`, `MINIAPP_SURFACE_WINDOW_*`,
+`MiniAppWindowState`, `MiniAppWindowPatch` and their parsers. It is the last contiguous
 region of the file, so a future synchronization reads as one omitted tail rather than as a series of
 local divergences. One private helper has to come out of that tail: `isPlainRecord` is declared
 inside the window block but used nine times by the agent parsers above it, so it is kept at the seam
@@ -132,8 +135,8 @@ three keys the newer generation declares and this repository's reader does not k
 `agentAccess` and `agentConcurrency`. Its field sets are strict, so an unknown key fails the package
 as `MANIFEST_SCHEMA_INVALID` — a package built for the shipped client is rejected before any of this
 work can matter. Accepting is not supporting: `surface.window` is read and ignored here, because its
-effect was just dropped from the contract, while the two agent fields are enforced, because the agent
-capability is in scope below.
+effect was just dropped from the contract, while the two agent fields are validated and preserved here
+so the agent service can enforce them when it lands.
 
 ## The credential guard is carried over
 

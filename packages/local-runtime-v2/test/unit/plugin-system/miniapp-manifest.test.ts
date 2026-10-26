@@ -90,6 +90,16 @@ describe('Mini App manifest compatibility with the shipped generation', () => {
     },
   );
 
+  it.each([[1], [32], [4]])(
+    'accepts agentConcurrency %j without agentAccess, where it has no effect',
+    async (agentConcurrency) => {
+      const contribution = await readManifest({ agentConcurrency });
+
+      expect(contribution?.agentConcurrency).toBe(agentConcurrency);
+      expect(contribution).not.toHaveProperty('agentAccess');
+    },
+  );
+
   it.each([[0], [33], [4.5], ['4'], [null]])(
     'fails closed for agentConcurrency %j',
     async (agentConcurrency) => {
@@ -110,6 +120,10 @@ describe('Mini App manifest allowlist', () => {
   it('fails an unknown key beside surface.window', async () => {
     await expect(
       readManifest({ surface: { path: '/dashboard', window: {}, surfaceId: 'app' } }),
-    ).rejects.toMatchObject({ code: 'MINIAPP_SURFACE_INVALID' });
+    ).rejects.toMatchObject({
+      // The message is part of the behaviour: a relaxed predicate must not read as a pass.
+      code: 'MINIAPP_SURFACE_INVALID',
+      message: 'MINIAPP_SURFACE_INVALID: surface must contain only path and window',
+    });
   });
 });
