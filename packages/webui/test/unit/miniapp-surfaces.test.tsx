@@ -459,11 +459,22 @@ describe("a detached view whose standalone tab goes away", () => {
   const PLUGIN = "dashboard";
   const SESSION = "session-1";
 
-  function leasePort(input: { readonly detached: () => boolean }) {
+  function leasePort(input: {
+    readonly detached: () => boolean;
+    /** The runtime state the fresh catalogue answers with. Running by default. */
+    readonly status?: () => WebuiMiniAppSummary["runtime"]["status"];
+  }) {
     let opens = 0;
     const port: WebuiMiniAppPortSlice = {
       listMiniApps: async () => ({
-        miniApps: [summary(PLUGIN, "running", {}, { detached: input.detached(), presentationRevision: 1 })],
+        miniApps: [
+          summary(
+            PLUGIN,
+            input.status?.() ?? "running",
+            {},
+            { detached: input.detached(), presentationRevision: 1 },
+          ),
+        ],
       }),
       openMiniApp: async ({ pluginId }) => {
         opens += 1;
@@ -512,6 +523,40 @@ describe("a detached view whose standalone tab goes away", () => {
     expect(resumed).toContain('data-testid="miniapp-view-frame"');
     expect(workflows.getSnapshot().listing.rows[0]?.detached).toBe(false);
     expect(workflows.getSnapshot().presentations[PLUGIN]?.kind).toBe("open");
+    expect(opens()).toBe(1);
+  });
+
+  it("does not reopen an app another document stopped while it waits", async () => {
+    // The cross-document lifecycle: this view is waiting on a lease another document
+    // holds, and the person stops the app there. The next catalogue answer has the
+    // lease released *and* a stopped runtime, which is a terminal state this client
+    // never asked for — #256's rule is that it is reported, not reconnected.
+    let detached = true;
+    let status: WebuiMiniAppSummary["runtime"]["status"] = "running";
+    const { port, opens } = leasePort({ detached: () => detached, status: () => status });
+    const workflows = createWebuiMiniAppWorkflows({ port });
+
+    await workflows.loadListing();
+    expect(await workflows.presentInline(PLUGIN)).toBe("waiting");
+    expect(opens()).toBe(0);
+
+    detached = false;
+    status = "stopped";
+
+    expect(await workflows.presentInline(PLUGIN)).toBe("blocked");
+    expect(opens()).toBe(0);
+    // The stop is reported rather than swallowed: the surface says why, and the
+    // retry it offers is the person's.
+    const stopped = renderInline(workflows);
+    expect(stopped).toContain('data-testid="miniapp-view-stopped"');
+    expect(stopped).toContain("运行已停止");
+    expect(stopped).toContain("重新打开");
+    expect(stopped).not.toContain("miniapp-view-frame");
+    // Every later tick is terminal too: the poll cannot become a restart.
+    expect(await workflows.presentInline(PLUGIN)).toBe("blocked");
+    expect(opens()).toBe(0);
+    // Explicit retry still works.
+    expect(await workflows.open(PLUGIN)).toBe(true);
     expect(opens()).toBe(1);
   });
 

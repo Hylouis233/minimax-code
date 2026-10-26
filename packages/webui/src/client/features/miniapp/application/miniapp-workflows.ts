@@ -436,10 +436,22 @@ export function createWebuiMiniAppWorkflows(deps: {
       // could present a Mini App another tab is already showing. Ask again.
       return "waiting";
     }
-    const row = (catalogue?.miniApps ?? state.listing.rows).find(
-      (candidate) => candidate.pluginId === pluginId,
-    );
+    // A host that does not wire the catalogue has no presentation record to read,
+    // so there is nothing to wait for and nothing to honour: start it, as the
+    // mount always did.
+    if (catalogue === undefined) return (await open(pluginId)) ? "presented" : "blocked";
+    const row = catalogue.miniApps.find((candidate) => candidate.pluginId === pluginId);
     if (row?.detached === true) return "waiting";
+    if (row?.runtime.status === "stopped") {
+      // Terminal, and not this client's doing: the runtime is down and nobody here
+      // asked it to stop, which is the cross-document case — this view was waiting
+      // on another document's lease when that document stopped the app. #256's rule
+      // is that a stopped runtime is reported and never reconnected without a
+      // person, so the state is recorded (which is what makes the surface say why
+      // and offer its own retry) and the loop ends.
+      setPresentation(pluginId, { kind: "stopped", reason: "运行已停止。" });
+      return "blocked";
+    }
     return (await open(pluginId)) ? "presented" : "blocked";
   };
 
