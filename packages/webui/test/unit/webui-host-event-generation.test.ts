@@ -55,6 +55,17 @@ describe("host-derived event types", () => {
         'declare function publish(value: object): void; publish({type: "message.miniapp_owned" as const});\n',
       );
 
+      // The child IPC connector answers the same run frames the agent session declares.
+      const connector = path.join(directory, "service/miniapp/process/host-connector");
+      mkdirSync(connector, { recursive: true });
+      writeFileSync(
+        path.join(connector, "host-connector-agent.ts"),
+        'declare function emit(value: object): void; emit({type: "permission.requested" as const}); emit({type: "question.requested" as const});\n',
+      );
+      writeFileSync(
+        path.join(connector, "host-connector.ts"),
+        'declare function publish(value: object): void; publish({type: "stream.connector_opened" as const});\n',
+      );
       // The exclusion is per file, so a host producer in the same folder is still catalogued.
       writeFileSync(
         path.join(agent, "surface-host-producer.ts"),
@@ -65,11 +76,13 @@ describe("host-derived event types", () => {
       expect(catalogue).toContain('"session.published"');
       expect(catalogue).toContain('"message.miniapp_owned"');
       expect(catalogue).toContain('"session.from_agent_dir"');
+      expect(catalogue).toContain('"stream.connector_opened"');
       for (const frame of [
         "turn.started",
         "turn.finished",
         "message.committed",
         "permission.requested",
+        "question.requested",
       ]) {
         expect(catalogue).not.toContain(`"${frame}"`);
       }

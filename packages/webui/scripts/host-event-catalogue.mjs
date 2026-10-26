@@ -19,6 +19,8 @@ const excludedSources = [
   path.join("service", "miniapp", "agent", "gateway.ts"),
   path.join("service", "miniapp", "agent", "session-ports.ts"),
   path.join("service", "miniapp", "agent", "session-ports-projection.ts"),
+  // The child IPC connector answers those same run frames over the parent/child channel.
+  path.join("service", "miniapp", "process", "host-connector", "host-connector-agent.ts"),
 ];
 
 
