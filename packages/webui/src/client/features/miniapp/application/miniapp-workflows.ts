@@ -218,6 +218,9 @@ export function createWebuiMiniAppWorkflows(deps: {
     try {
       const view = await port.openMiniApp({ pluginId });
       setPresentation(pluginId, { kind: "open", viewUrl: view.viewUrl });
+      // The catalogue can open a Mini App without mounting its panel view, so
+      // nothing else would refresh the runtime status after a successful start.
+      await loadListing();
       return true;
     } catch (error) {
       const refusal = refusalOf(error);
