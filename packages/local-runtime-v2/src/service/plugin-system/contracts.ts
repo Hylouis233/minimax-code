@@ -202,6 +202,14 @@ export interface AvailableMiniAppDefinition {
   readonly displayName?: string;
   readonly description?: string;
   readonly iconPath?: string;
+  /**
+   * Whether the runtime may start this package.
+   *
+   * Absent on `listAvailableMiniApps`, whose entries are enabled by definition;
+   * set by `listInstalledMiniApps`, which also answers for a disabled local
+   * package so a management surface can offer to enable it.
+   */
+  readonly enabled?: boolean;
 }
 
 export interface WorkspaceMiniAppInitializationResult {
@@ -216,6 +224,14 @@ export interface MiniAppPluginControl {
   /** True only when the accepted candidate still owns the authoritative active generation. */
   isAcceptedMiniAppRunning(pluginId: string): boolean;
   listAvailableMiniApps(): Promise<readonly AvailableMiniAppDefinition[]>;
+  /**
+   * Every installed Mini App, enabled or not.
+   *
+   * A read only: activation, publication and the projection keep reading
+   * `listAvailableMiniApps`, so a disabled package stays unstartable while still
+   * being visible to the surface that can enable it.
+   */
+  listInstalledMiniApps(): Promise<readonly AvailableMiniAppDefinition[]>;
   activateMiniApp(input: {
     readonly pluginId: string;
     readonly signal?: AbortSignal;

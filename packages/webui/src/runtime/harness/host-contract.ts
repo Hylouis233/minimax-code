@@ -575,6 +575,49 @@ export interface WebuiRuntimeCliService {
     readonly reason: "ui_request";
     readonly customInstructions?: string;
   }): Promise<HostResult<"requestCompaction">>;
+  /**
+   * The Mini App cell of the runtime's owner policy.
+   *
+   * Optional on the same terms as the memory pair: a host composed without the
+   * Mini App capability still has to satisfy this shape, and the adapter's guard
+   * turns the absent member into one `capability_unavailable` refusal instead of
+   * an empty catalogue. Results are the runtime's own (`HostResult`), because the
+   * publishable summary and the server-only launch are converted at the adapter —
+   * a `WebuiMiniAppLaunch` is not a shape the runtime has, it is what the WebUI
+   * makes of one.
+   */
+  listMiniApps?(): Promise<HostResult<"listMiniApps">>;
+  /**
+   * The installed set, including a Mini App the person disabled.
+   *
+   * Optional: a host whose runtime predates the installed read answers only
+   * `listMiniApps`, and the adapter falls back to it. `enabled: false` on a row is
+   * what tells the catalogue to offer "enable" rather than "open".
+   */
+  listInstalledMiniApps?(): Promise<HostResult<"listMiniApps">>;
+  openMiniApp?(
+    request: WebuiHostRequest<"openMiniApp">,
+  ): Promise<HostResult<"openMiniApp">>;
+  stopMiniApp?(
+    request: WebuiHostRequest<"stopMiniApp">,
+  ): Promise<HostResult<"stopMiniApp">>;
+  /**
+   * The Mini App Agent facade.
+   *
+   * Present together or absent together: the runtime composes all nine from one
+   * application cell, so a host with two of them is broken rather than partial and
+   * the adapter refuses all nine. The parameter shapes are the facade's own
+   * (`CliService`), including the `caller` the service resolved for the page.
+   */
+  runMiniAppAgentTurn?: CliService["runMiniAppAgentTurn"];
+  answerMiniAppAgentQuestion?: CliService["answerMiniAppAgentQuestion"];
+  replyMiniAppAgentPermission?: CliService["replyMiniAppAgentPermission"];
+  openMiniAppAgentSession?: CliService["openMiniAppAgentSession"];
+  panelOpenedMiniAppAgentSession?: CliService["panelOpenedMiniAppAgentSession"];
+  panelClosedMiniAppAgentSession?: CliService["panelClosedMiniAppAgentSession"];
+  listMiniAppAgentModels?: CliService["listMiniAppAgentModels"];
+  listMiniAppAgentAgents?: CliService["listMiniAppAgentAgents"];
+  createMiniAppAgentSession?: CliService["createMiniAppAgentSession"];
 }
 
 export interface WebuiRuntimeHostHandle {

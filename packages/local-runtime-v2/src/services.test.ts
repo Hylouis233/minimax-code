@@ -8,9 +8,10 @@ import { createAgentRuntime, type AgentExtension } from "@mavis/agent-runtime";
 import { baseCtx } from "../../agent-runtime/src/testing/fixtures.js";
 import type { RuntimeTool } from "@mavis/agent-core/tools";
 import { LocalSkillToolDef } from "@mavis/agent-tools/desktop";
-import type {
-  DatabaseLike,
-  QuestionnaireOwnedActionHandler,
+import {
+  resolveRuntimeOwnerPolicy,
+  type DatabaseLike,
+  type QuestionnaireOwnedActionHandler,
 } from "@mavis/local-runtime";
 import type {
   GlobalEvent,
@@ -1555,18 +1556,33 @@ describe("runtime services composition", () => {
       eventBus: new EventBus<GlobalEvent>(),
       compatibility: defaultCompatibility(),
       agentService: localAgentService,
+      ownerPolicy: resolveRuntimeOwnerPolicy({
+        kind: "webui",
+        cliEmbedded: false,
+        electronHost: false,
+        capabilityProfile: undefined,
+      }),
       miniApp: {},
     });
 
     expect(services.miniApp).toBe(mocked.miniAppSupervisor);
     assertProcessLocalMiniAppComposition();
     expect(mocked.miniAppOptions).toMatchObject({
+      ownerClient: "webui",
       db: {},
       connectorGateway: mocked.hostConnectorGateway,
       verifyCandidate: expect.any(Function),
       materializePackage: expect.any(Function),
       resolvePluginDataDir: expect.any(Function),
     });
+    // The child IPC connector registers its arena against this same gateway, so the Supervisor
+    // must receive the instance the runtime created rather than a second one.
+    expect(mocked.miniAppOptions?.["agentGateway"]).toMatchObject({
+      registerArena: expect.any(Function),
+      run: expect.any(Function),
+      reply: expect.any(Function),
+    });
+
     expect(mocked.events).toContain("plugin:attach-miniapp");
     expect(mocked.events.indexOf("plugin:attach-miniapp")).toBeLessThan(
       mocked.events.indexOf("turn:create"),

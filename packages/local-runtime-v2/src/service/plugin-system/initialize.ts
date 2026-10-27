@@ -167,6 +167,8 @@ export function initializePluginService(
       system.miniAppPublication.isAcceptedMiniAppRunning(pluginId),
     listAvailableMiniApps: () =>
       system.miniAppPublication.listAvailableMiniApps(),
+    listInstalledMiniApps: () =>
+      system.miniAppPublication.listInstalledMiniApps(),
     activateMiniApp: (input) => system.miniAppPublication.activate(input),
     initializeWorkspaceMiniApp: (input) =>
       system.miniAppPublication.initializeWorkspace(input),

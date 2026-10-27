@@ -165,6 +165,38 @@ export const GET_USER_PROFILE_OPERATION_NAME = "getUserProfile" as const;
 export const SET_USER_PROFILE_OPERATION_NAME = "setUserProfile" as const;
 export const GET_MEMORY_SETTINGS_OPERATION_NAME = "getMemorySettings" as const;
 export const SET_MEMORY_SETTINGS_OPERATION_NAME = "setMemorySettings" as const;
+// The Mini App surface. Four operations over one runtime capability: the
+// catalogue, the launch, the stop, and the standalone presentation lease.
+// `openMiniApp` answers with a loopback view URL rather than the Mini App's own
+// coordinates, so the credential the Mini App's guard demands never leaves the
+// server. `watchMiniAppPresentation` is a stream rather than a request because
+// its lifetime is the standalone document's, not one round trip's (ADR 0020:
+// the lease is released when that client's socket closes).
+export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
+export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
+export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
+export const WATCH_MINI_APP_PRESENTATION_OPERATION_NAME = "watchMiniAppPresentation" as const;
+export const WATCH_MINI_APP_PRESENTER_OPERATION_NAME = "watchMiniAppPresenter" as const;
+/**
+ * One followed Mini App turn (`run` / `answer`).
+ *
+ * A stream because the turn streams: its progress events and its terminal result
+ * arrive on one socket, and the socket closing is the only thing that ends a turn
+ * nobody settled. `observe` travels in the body because the transport being a
+ * stream says nothing about whether the page is listening (see
+ * `shared/contracts/miniapp-agent.ts`).
+ */
+export const WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME = "watchMiniAppAgentTurn" as const;
+/**
+ * One short Mini App agent call: `models`, `agents`, `create`, `reply`, `open`, the
+ * two panel reports, and `cancel`.
+ *
+ * One operation rather than eight because they share a body, a caller and one
+ * refusal envelope, and each answers with the `method` it names. A page's
+ * cancellation also belongs here: it is a call naming a request, not a socket
+ * being dropped.
+ */
+export const MINI_APP_AGENT_CALL_OPERATION_NAME = "miniAppAgentCall" as const;
 
 import type {
   WebuiActiveTurnResult,
@@ -297,6 +329,18 @@ import type {
   WebuiRunCommandResult,
 } from "./contracts/terminal.js";
 import type { WebuiPluginManagementRequest } from "./plugin-management.js";
+import type {
+  WebuiMiniAppCatalogue,
+  WebuiMiniAppPresentationIntent,
+  WebuiMiniAppPresentationState,
+  WebuiMiniAppView,
+} from "./contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentCallRequest,
+  WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "./contracts/miniapp-agent.js";
 
 /**
  * The complete operation table: every wire operation name mapped to the
@@ -495,6 +539,10 @@ export interface OperationSpec {
   watchBrowserWebTabs: {
     request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserWebTabStreamEnvelope;
+  };
+  watchMiniAppPresenter: {
+    request: undefined;
+    response: WebuiMiniAppPresenterStreamEnvelope;
   };
   /**
    * A url, and optionally the run the page is opened for. There is no surface:
@@ -755,6 +803,61 @@ export interface OperationSpec {
     request: { readonly enabled?: boolean; readonly proactive?: boolean };
     response: WebuiMemorySettingsView;
   };
+  /**
+   * The Mini App catalogue. A row's `runtime.status` is why this is not just a
+   * plugin list: the picker offers "open" or "stop" from it. A row's
+   * `detached`/`presentationRevision` are the service's own record, which is why
+   * the response is `WebuiMiniAppCatalogue` and not the runtime's
+   * `WebuiMiniAppList`.
+   */
+  listMiniApps: { request: undefined; response: WebuiMiniAppCatalogue };
+  /**
+   * Starts one Mini App and names where to frame it.
+   *
+   * The response is the loopback proxy's `viewUrl` and the plugin it belongs to.
+   * The Mini App's own origin, surface path and launch credential stay on the
+   * server: the proxy is the only thing that sees them, and it injects the
+   * credential on the way out.
+   */
+  openMiniApp: {
+    request: { readonly pluginId: string };
+    response: WebuiMiniAppView;
+  };
+  /** Stops one Mini App and closes the proxy that was serving it. */
+  stopMiniApp: {
+    request: { readonly pluginId: string };
+    response: { readonly success: true };
+  };
+  /**
+   * The standalone presentation lease (ADR 0020).
+   *
+   * A standalone document declares its plugin, its session and its presentation
+   * by connecting; the lease lives as long as that socket does, which is what
+   * makes `detached` in the catalogue a live fact instead of a constant. It is a
+   * stream for exactly that reason: a unary request would settle in milliseconds
+   * and release the record with it.
+   */
+  watchMiniAppPresentation: {
+    request: { readonly pluginId: string; readonly sessionId: string };
+    response: WebuiMiniAppPresentationStreamEnvelope;
+  };
+  /**
+   * One followed Mini App turn.
+   *
+   * The body is the page's request plus the identity the host resolved for it; the
+   * frames are its progress events and, last, how it settled. A turn's refusal is a
+   * frame rather than a wire error, because "the runtime said no" and "the request
+   * was malformed" are different answers and only the second one is the wire's.
+   */
+  watchMiniAppAgentTurn: {
+    request: WebuiMiniAppAgentTurnRequest;
+    response: WebuiMiniAppAgentTurnStreamEnvelope;
+  };
+  /** One short Mini App agent call, refusal included in the body. */
+  miniAppAgentCall: {
+    request: WebuiMiniAppAgentCallRequest;
+    response: WebuiMiniAppAgentCallResponse;
+  };
 }
 
 /**
@@ -775,6 +878,9 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_TERMINAL_OPERATION_NAME,
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -814,6 +920,43 @@ export interface WebuiBrowserWebTabStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
+  };
+}
+
+/** The client presentation intent stream from the runtime-owned presenter. */
+export interface WebuiMiniAppPresenterStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppPresentationIntent>;
+  };
+}
+
+/**
+ * The `{ stream }` envelope for the standalone presentation lease.
+ *
+ * Named after the operation rather than its frames because the stream's value is
+ * its lifetime: one frame says what the lease is, and the socket staying open is
+ * what keeps it. A `[DONE]` would mean the presentation ended.
+ */
+export interface WebuiMiniAppPresentationStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppPresentationState>;
+  };
+}
+
+/**
+ * The `{ stream }` envelope for one followed Mini App turn.
+ *
+ * Frames are the runtime's own run events, then exactly one settlement: `settled`
+ * with the turn's result, or `failure` with a closed failure code. The settlement
+ * is the promise's answer, which is why it is a frame of the same stream rather
+ * than a second request.
+ */
+export interface WebuiMiniAppAgentTurnStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppAgentTurnFrame>;
   };
 }
 

@@ -10,6 +10,13 @@ export { sendMessageOperation, enqueueMessageOperation, resumeSessionOperation }
 export { watchEventsOperation, listPendingPermissionsOperation, getPendingQuestionnaireOperation, replyPermissionOperation, replyQuestionnaireOperation, dismissQuestionnaireOperation } from "./questionnaire.js";
 export { abortSessionOperation, listQueueMessagesOperation, deleteQueueItemOperation, listModelsOperation, listSkillsOperation, selectModelOperation, getSessionUsageOperation } from "./queue.js";
 export { pluginManagementOperation } from "./plugin-management.js";
+export {
+  listMiniAppsOperation,
+  openMiniAppOperation,
+  stopMiniAppOperation,
+  watchMiniAppPresentationOperation,
+  watchMiniAppPresenterOperation,
+} from "./miniapp.js";
 export { getPermissionModeOperation, setPermissionModeOperation } from "./permission-mode.js";
 export { getGlobalInstructionsOperation, setGlobalInstructionsOperation } from "./personalization.js";
 export { getAgentMemoryOperation, setAgentMemoryOperation } from "./agent-memory.js";
@@ -21,6 +28,11 @@ import {
   type WebuiOperationPort,
 } from "./bind-handlers.js";
 import { createWorkspaceHandlerEntries } from "./handlers/workspace.js";
+import { createMiniAppHandlerEntries } from "./handlers/miniapp.js";
+import { createMiniAppAgentHandlerEntries } from "./handlers/miniapp-agent.js";
+import { createMiniAppAgentConnections } from "../miniapp/agent-connections.js";
+import { createMiniAppAgentPanels } from "../miniapp/agent-panels.js";
+import { createMiniAppAgentRuns } from "../miniapp/agent-runs.js";
 import { createTerminalHandlerEntries } from "./handlers/terminal.js";
 import {
   createBrowserHandlerEntries,
@@ -37,6 +49,8 @@ import type {
 } from "./operation-contract.js";
 import type { WebuiTerminalProcessPort } from "../../runtime/port.js";
 import type { WebuiBrowserPort } from "../../runtime/port.js";
+import type { MiniAppProxyRegistry } from "../miniapp/proxy-registry.js";
+import type { MiniAppPresenterView } from "../miniapp/presenter.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
@@ -63,7 +77,7 @@ export type {
 } from "./operation-contract.js";
 
 /**
- * Builds the operation registry: 86 statically declared bindings plus the 13
+ * Builds the operation registry: 93 statically declared bindings plus the 16
  * operations that keep dedicated handlers.
  *
  * The registration order below is observable on the wire and must not change;
@@ -82,8 +96,24 @@ export function createOperationRegistry(
    * answers `not_provisioned` rather than failing to assemble.
    */
   browserInstallationKeys?: WebuiBrowserBridgeInstallationKeySource,
+  /**
+   * The Mini App listeners. Passing one lets the service close them on shutdown;
+   * omitting it leaves the Mini App handlers holding a private registry.
+   */
+  miniAppProxies?: MiniAppProxyRegistry,
+  miniAppPresenter?: MiniAppPresenterView,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
+  /**
+   * The Mini App page bridge's two records, shared by both handler sets.
+   *
+   * One set starts and stops presentations and therefore records generations; the
+   * other answers a page's calls and checks them against those generations. Two
+   * instances would be two answers to "is this page the live one".
+   */
+  const miniAppConnections = createMiniAppAgentConnections();
+  const miniAppRuns = createMiniAppAgentRuns();
+  const miniAppPanels = createMiniAppAgentPanels();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
     ...createBindingEntries(port),
     ...createWorkspaceHandlerEntries(),
@@ -91,6 +121,18 @@ export function createOperationRegistry(
     ...createAccountHandlerEntries(port),
     ...createStreamHandlerEntries(port),
     ...createMessageHandlerEntries(port),
+    ...createMiniAppHandlerEntries(port, {
+      ...(miniAppProxies ? { proxies: miniAppProxies } : {}),
+      ...(miniAppPresenter ? { presenter: miniAppPresenter } : {}),
+      connections: miniAppConnections,
+      panels: miniAppPanels,
+      runs: miniAppRuns,
+    }),
+    ...createMiniAppAgentHandlerEntries(port, {
+      connections: miniAppConnections,
+      runs: miniAppRuns,
+      panels: miniAppPanels,
+    }),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
     ...(browser ? createBrowserHandlerEntries(browser, browserInstallationKeys) : []),
   ]);
@@ -265,6 +307,18 @@ export function createOperationRegistry(
   registerOperation(registry, entry("sendMessage"));
   registerOperation(registry, entry("enqueueMessage"));
   registerOperation(registry, entry("resumeSession"));
+  // The Mini App surface is registered unconditionally, like every capability
+  // since batch C: a host without the Mini App cell answers
+  // `capability_unavailable` from the handler, which is a different statement
+  // from "this operation does not exist here" and one the client can branch on.
+  registerOperation(registry, entry("listMiniApps"));
+  registerOperation(registry, entry("openMiniApp"));
+  registerOperation(registry, entry("stopMiniApp"));
+  registerOperation(registry, entry("watchMiniAppPresentation"));
+  registerOperation(registry, entry("watchMiniAppPresenter"));
+  // The page bridge, appended so the registry order before it is unchanged.
+  registerOperation(registry, entry("watchMiniAppAgentTurn"));
+  registerOperation(registry, entry("miniAppAgentCall"));
   return registry;
 }
 

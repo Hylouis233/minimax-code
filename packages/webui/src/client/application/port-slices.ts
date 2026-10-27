@@ -53,6 +53,8 @@ import type { TurnExecutionPort } from "../features/turn/contracts/execution-por
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
 import type { BrowserPort } from "../features/browser/contracts/browser-port.js";
 import type { WorkspacePort } from "../features/workspace/contracts/workspace-port.js";
+import type { WebuiMiniAppPortSlice } from "../features/miniapp/application/miniapp-workflows.js";
+import type { MiniAppPort } from "../features/miniapp/contracts/miniapp-port.js";
 import {
   createWebuiTurnCapabilitySlice,
   type WebuiTurnCapabilitySlice,
@@ -77,7 +79,8 @@ export interface WebuiPortSliceSource
     ModelsPort,
     AccountPort,
     PluginPort,
-    BrowserPort {}
+    BrowserPort,
+    MiniAppPort {}
 
 // The key lists below are the old-to-new mapping as data. Each is checked
 // against its port by `satisfies`, so a renamed or removed member stops the
@@ -234,6 +237,16 @@ const ACCOUNT_KEYS = [
 
 const SHELL_KEYS = ["watchEvents"] as const satisfies readonly (keyof ShellEventPort)[];
 
+const MINIAPP_KEYS = [
+  "watchMiniAppPresenter",
+  "listMiniApps",
+  "openMiniApp",
+  "stopMiniApp",
+  "watchMiniAppPresentation",
+  "miniappStandaloneUrl",
+  "pluginManagement",
+] as const satisfies readonly (keyof MiniAppPort | keyof PluginPort)[];
+
 export type WebuiSessionsSlice = Pick<SessionPort, (typeof SESSIONS_KEYS)[number]>;
 export type WebuiTranscriptSlice = Pick<TranscriptPort, (typeof TRANSCRIPT_KEYS)[number]>;
 export type WebuiWorkspaceSlice = Pick<WorkspacePort, (typeof WORKSPACE_KEYS)[number]> &
@@ -250,6 +263,7 @@ export type WebuiSettingsSlice = Pick<SettingsPort, (typeof SETTINGS_KEYS)[numbe
 export type WebuiAccountSlice = Pick<AccountPort, (typeof ACCOUNT_KEYS)[number]>;
 export type WebuiShellSlice = Pick<ShellEventPort, (typeof SHELL_KEYS)[number]>;
 export type WebuiBrowserSlice = Pick<BrowserPort, (typeof BROWSER_KEYS)[number]>;
+export type WebuiMiniAppSlice = WebuiMiniAppPortSlice;
 export type WebuiTurnSlice = WebuiTurnCapabilitySlice;
 
 /** One slice per business. */
@@ -266,6 +280,7 @@ export interface WebuiPortSlices {
   readonly account: WebuiAccountSlice;
   readonly shell: WebuiShellSlice;
   readonly browser: WebuiBrowserSlice;
+  readonly miniapp: WebuiMiniAppSlice;
   readonly turn: WebuiTurnSlice;
 }
 
@@ -305,6 +320,7 @@ export function createWebuiPortSlices(
     account: cut(source, ACCOUNT_KEYS),
     shell: cut(source, SHELL_KEYS),
     browser: cut(source, BROWSER_KEYS),
+    miniapp: cut(source, MINIAPP_KEYS),
     // `turn`'s published slice, built by its own factory so there is exactly one
     // construction site for it. That factory drops an absent member
     // instead of storing `undefined` under it, so `turn` is the one slice whose

@@ -42,6 +42,7 @@ import {
 } from "./http-server.js";
 import { WebuiWebSocketServer } from "./websocket-server.js";
 import type { BrowserBridgeServer } from "./browser-bridge/server.js";
+import type { MiniAppProxyRegistry } from "./miniapp/proxy-registry.js";
 import { serveHttpRequest, type WebuiHttpRouterContext } from "./http/router.js";
 
 export const WEBUI_MAX_MESSAGE_BYTES = 256 * 1024;
@@ -176,6 +177,16 @@ export interface WebuiServiceOptions {
    * first existing candidate under `findClientDirectory()`.
    */
   readonly clientDir?: string;
+  /**
+   * The Mini App loopback listeners the operation registry holds.
+   *
+   * The registry creates them (`createMiniAppProxyRegistry`), and this service
+   * closes them on the way down: a listener is one port per plugin, and a leaked
+   * one makes that Mini App unstartable until the process that held it exits.
+   * Optional so a host that assembles its registry without Mini App proxies still
+   * gets a service.
+   */
+  readonly miniappProxies?: MiniAppProxyRegistry;
 }
 
 export interface WebuiServiceInfo {
@@ -200,6 +211,15 @@ export class WebuiService {
   private readonly wsServer: WebuiWebSocketServer;
   private readonly terminal: WebuiTerminalProcessPort | undefined;
   private readonly browserBridge: BrowserBridgeServer | undefined;
+  /**
+   * The Mini App listeners this service owns.
+   *
+   * Held here rather than only inside the operation handlers because a shutdown
+   * has to close them: a leaked listener holds a plugin's derived port, and the
+   * next start of that Mini App fails to bind it. Optional, because the registry
+   * is created by whoever assembles the operation table.
+   */
+  private readonly miniappProxies: MiniAppProxyRegistry | undefined;
   private readonly httpContext: WebuiHttpRouterContext;
   private accepting = true;
   private startedPromise: Promise<WebuiServiceInfo> | undefined;
@@ -226,6 +246,7 @@ export class WebuiService {
     this.operations = withRegistryDerivedAvailability(options.operations, options.port);
     this.terminal = options.terminal;
     this.browserBridge = options.browserBridge;
+    this.miniappProxies = options.miniappProxies;
     this.httpServer = createHttpListener(options.httpServerFactory);
     this.wsServer = new WebuiWebSocketServer({
       maxMessageBytes: this.maxMessageBytes,
@@ -306,6 +327,10 @@ export class WebuiService {
     // second listener on the same process, and an extension still mid-handshake
     // would otherwise be terminated by the HTTP listener going away first.
     await this.browserBridge?.close();
+    // The Mini App listeners are closed before the harness port: the runtime
+    // stops the applications afterwards, and a listener whose upstream is gone
+    // would answer 502 for the rest of the shutdown.
+    await this.miniappProxies?.closeAll();
     await closeHttpListener(this.httpServer);
     await this.port.close();
   }

@@ -53,6 +53,84 @@ describe("composeProcessLocalApplication workspace ownership", () => {
   });
 });
 
+describe("composeProcessLocalApplication Mini App agent exposure", () => {
+  function compose(miniAppAgent: unknown) {
+    return composeProcessLocalApplication({
+      eventBus: { subscribe: vi.fn(() => () => undefined) },
+      usageCommits: undefined,
+      workspaceGit: {
+        getMetadata: vi.fn(),
+        getChanges: vi.fn(),
+        getReviewSummary: vi.fn(),
+        listReviewFileDiffs: vi.fn(),
+        getReviewFileContent: vi.fn(),
+        searchReviewDiffs: vi.fn(),
+      } as never,
+      compatibility: {
+        skills: { listSkills: vi.fn(), listRuntimeSkills: vi.fn() },
+        peripherals: {},
+      } as never,
+      listRuntimeSkills: vi.fn(),
+      plugins: {} as never,
+      pluginControl: {} as never,
+      miniApp: undefined,
+      miniAppAgent: miniAppAgent as never,
+      planEntryEnabled: () => false,
+      mcp: {} as never,
+      modelProvider: {
+        application: {} as never,
+        providers: {} as never,
+        listProviderPresets: vi.fn(),
+        oauth: {} as never,
+      },
+    });
+  }
+
+  function gatewayDouble() {
+    return {
+      bind: vi.fn(),
+      registerArena: vi.fn(),
+      panelOpened: vi.fn(async () => undefined),
+      panelClosed: vi.fn(async () => undefined),
+      subscribePermissionAsks: vi.fn(),
+      run: vi.fn(async () => ({ sessionId: "s", status: "finished" as const })),
+      models: vi.fn(async () => ({ models: [], default: { providerId: "p", modelId: "m" } })),
+      agents: vi.fn(async () => ({ agents: [] })),
+      create: vi.fn(async () => ({ sessionId: "s" })),
+      reply: vi.fn(async () => undefined),
+      answer: vi.fn(async () => ({ sessionId: "s", status: "finished" as const })),
+      open: vi.fn(async () => ({ sessionId: "s", hostSessionId: "chat" })),
+    };
+  }
+
+  it("publishes the client operations without the gateway or its ports", () => {
+    const application = compose(gatewayDouble());
+
+    expect(Object.keys(application.miniAppAgent ?? {}).sort()).toEqual([
+      "agents",
+      "answer",
+      "create",
+      "models",
+      "open",
+      "panelClosed",
+      "panelOpened",
+      "reply",
+      "run",
+    ]);
+    for (const internal of ["bind", "registerArena", "ports", "subscribePermissionAsks"]) {
+      expect(application.miniAppAgent).not.toHaveProperty(internal);
+    }
+    // Nothing else on the facade grew a hole into the gateway.
+    expect(JSON.stringify(application)).not.toContain("registerArena");
+  });
+
+  it("publishes no agent API when the runtime has no gateway", () => {
+    const application = compose(undefined);
+
+    expect(application.miniAppAgent).toBeUndefined();
+  });
+});
+
 describe("SessionContentApplication history message serialization", () => {
   it("keeps ordered activity parts in the opaque rawJson channel", () => {
     const parts = [

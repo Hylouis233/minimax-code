@@ -58,6 +58,16 @@ const EXPECTED: Record<
     "listBrowserCapabilities",
     "getBrowserInstallationKey",
   ],
+  miniapp: [
+    "listMiniApps", "openMiniApp", "stopMiniApp",
+    // ADR 0020's standalone presentation: the lease this document holds, and the
+    // deep link that opens one. Both belong to this business because both are
+    // Mini App presentation facts, not layout ones.
+    "watchMiniAppPresentation", "miniappStandaloneUrl",
+    // A Mini App is a plugin, so the catalogue's apps area writes the package
+    // lifecycle through the same member the plugin manager does.
+    "pluginManagement",
+  ],
   composer: ["runCommand", "enqueueMessage", "listQueueMessages", "deleteQueueItem"],
   interactions: [
     "listPendingPermissions", "getPendingQuestionnaire", "replyPermission",

@@ -28,6 +28,8 @@ import type { WebuiOperationPort } from "../../src/server/operation/bind-handler
 import { createStreamHandlerEntries } from "../../src/server/operation/handlers/stream.js";
 import { watchTerminalOperation } from "../../src/server/operation/workspace.js";
 import { watchBrowserFramesOperation, watchBrowserWebTabsOperation } from "../../src/server/operation/browser.js";
+import { watchMiniAppPresentationOperation } from "../../src/server/operation/miniapp.js";
+import { watchMiniAppAgentTurnOperation } from "../../src/server/operation/miniapp-agent.js";
 import {
   WEBUI_STREAM_OPERATION_NAMES,
   type OperationSpec,
@@ -116,7 +118,7 @@ describe("the unary request interface over OperationSpec", () => {
         `${name} is a stream and must not be unary`,
       );
     }
-    assert.equal(streams.length, 6);
+    assert.equal(streams.length, 8);
   });
 
   it("matches the server's registered stream descriptors exactly", () => {
@@ -125,6 +127,11 @@ describe("the unary request interface over OperationSpec", () => {
       watchTerminalOperation.name,
       watchBrowserFramesOperation.name,
       watchBrowserWebTabsOperation.name,
+      watchMiniAppPresentationOperation.name,
+      // The page bridge's turn is a stream too, and it keeps a dedicated handler:
+      // its frames are the runtime's run events plus one settlement, which the
+      // generic stream factory does not shape.
+      watchMiniAppAgentTurnOperation.name,
     ].sort();
     assert.deepEqual(registered, [...WEBUI_STREAM_OPERATION_NAMES].sort());
   });

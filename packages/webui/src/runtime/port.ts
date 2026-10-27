@@ -1,3 +1,12 @@
+import type {
+  MiniAppAgentAgents,
+  MiniAppAgentModelSelection,
+  MiniAppAgentModels,
+  MiniAppAgentPermissionDecision,
+  MiniAppAgentRunEvent,
+  MiniAppAgentRunResult,
+} from "@mavis/shared/miniapp-surface";
+import type { AskQuestionnaireReplyAnswer } from "@mavis/shared/questionnaire";
 import type { WebuiPluginManagementRequest } from "../shared/plugin-management.js";
 import type {
   WebuiRunCommandRequest,
@@ -108,6 +117,10 @@ import type {
   WebuiTestUserModelCandidateRequest,
 } from "../shared/contracts/models.js";
 import type { WebuiHostPrerequisiteFacts } from "../shared/capability-manifest.js";
+import type {
+  WebuiMiniAppList,
+  WebuiMiniAppSummary,
+} from "../shared/contracts/miniapp.js";
 import type { WebuiVersionInfo } from "../shared/contracts/version.js";
 import type { WebuiUsageQuotaResult } from "../shared/contracts/usage-quota.js";
 import type {
@@ -572,11 +585,169 @@ export interface WebuiHarnessPort {
    */
   runCommand(request: WebuiRunCommandRequest): Promise<WebuiRunCommandResult>;
   /**
+   * The Mini App catalogue.
+   *
+   * Optional because the Mini App capability is a cell of the runtime's owner
+   * policy: a host whose application was composed without it has no Mini Apps at
+   * all, which is a different answer from an empty catalogue. The operations
+   * refuse with `capability_unavailable` when these members are absent, rather
+   * than reporting "no Mini Apps installed".
+   */
+  listMiniApps?(): Promise<WebuiMiniAppList>;
+  /**
+   * Starts one Mini App and hands back its launch coordinates.
+   *
+   * The result is **server-only**: `launch` carries the Mini App's real origin,
+   * the credential its own loopback guard demands and the header that credential
+   * is read from. `server/operation/handlers/miniapp.ts` turns it into a proxy
+   * and answers the browser with that proxy's URL; nothing in `launch` may be
+   * copied into a response. The `signal` is the requesting frame's, so a client
+   * that goes away stops waiting on a start.
+   */
+  openMiniApp?(request: {
+    readonly pluginId: string;
+    readonly signal?: AbortSignal;
+  }): Promise<WebuiMiniAppLaunch>;
+  /** Stops one Mini App. The caller closes its proxy. */
+  stopMiniApp?(request: {
+    readonly pluginId: string;
+    readonly signal?: AbortSignal;
+  }): Promise<void>;
+  /**
+   * The Mini App Agent API: what a page's `window.mcode.miniapp.agent` reaches.
+   *
+   * One capability with nine members, all optional together — a host composed
+   * without `miniAppAgent` has none of them, and the operations answer
+   * `capability_unavailable` rather than pretending a turn happened. `caller` is
+   * always the identity the service resolved for the page: never page-supplied.
+   */
+  runMiniAppAgentTurn?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly text: string;
+    /** Continue one of the plugin's sessions; absent creates one. */
+    readonly sessionId?: string;
+    /** Only when creating: the agent the session is bound to. */
+    readonly agent?: string;
+    readonly model?: MiniAppAgentModelSelection;
+    readonly signal?: AbortSignal;
+    /**
+     * The page's event listener, present only when the page asked to observe.
+     *
+     * The runtime counts a subscribed run as the party able to answer its
+     * permission and questionnaire asks, so a call with no listener must arrive
+     * with none: attaching one to collect the result would make every ask wait on
+     * a page that is not reading.
+     */
+    readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+  }): Promise<MiniAppAgentRunResult>;
+  /** The continuation turn a questionnaire answer starts; followed like a run. */
+  answerMiniAppAgentQuestion?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+    readonly requestId: string;
+    readonly answers: readonly AskQuestionnaireReplyAnswer[];
+    readonly model?: MiniAppAgentModelSelection;
+    readonly signal?: AbortSignal;
+    readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+  }): Promise<MiniAppAgentRunResult>;
+  /** Decides one pending permission ask. `allowOnce` or `deny`, never a global rule. */
+  replyMiniAppAgentPermission?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+    readonly requestId: string;
+    readonly decision: MiniAppAgentPermissionDecision;
+  }): Promise<void>;
+  /**
+   * Proves the plugin owns the session and that the caller has a host session to
+   * show it in. Showing it is the UI's act and is reported separately.
+   */
+  openMiniAppAgentSession?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+  }): Promise<{ readonly sessionId: string; readonly hostSessionId: string }>;
+  /** The UI now shows that session, so its asks are answerable. Idempotent. */
+  panelOpenedMiniAppAgentSession?(input: {
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+  }): Promise<void>;
+  /** The UI stopped showing it. Idempotent. */
+  panelClosedMiniAppAgentSession?(input: {
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+  }): Promise<void>;
+  /** The models a run may switch to, the default, and a page's host model. */
+  listMiniAppAgentModels?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+  }): Promise<MiniAppAgentModels>;
+  /** The agents a new Mini App session may be created for. */
+  listMiniAppAgentAgents?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+  }): Promise<MiniAppAgentAgents>;
+  /** A session without a turn; a `run` naming it continues it. */
+  createMiniAppAgentSession?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly agent?: string;
+  }): Promise<{ readonly sessionId: string }>;
+  /**
    * Release anything the port owns. The service calls this after closing
    * every transport-side resource so the harness can tear itself down in
    * the required order.
    */
   close(): Promise<void>;
+}
+
+/**
+ * The refusal a host without the Mini App cell gives, everywhere it is given.
+ *
+ * Declared beside the capability itself because two layers answer it — the
+ * adapter when the runtime's facade has no Mini App application, and the
+ * dedicated handlers when the port has no member at all — and one message is
+ * what keeps "this host has no Mini Apps" recognisable to a client regardless of
+ * which of the two noticed it.
+ */
+export const MINIAPP_CAPABILITY_ABSENT =
+  "runtime host does not expose the Mini App capability";
+
+/**
+ * The identity one Mini App page's call runs as.
+ *
+ * Resolved by the service from the presentation it issued — the plugin, the host
+ * session the view belongs to, and the launch's own process generation — and never
+ * taken from page content. `runId` is the launch's `runId`: the value the runtime
+ * keys a Mini App's registered arena on, so a page caller shares the arena its own
+ * process registered.
+ */
+export interface WebuiMiniAppAgentCaller {
+  readonly pluginId: string;
+  readonly runId: string;
+  /** The session whose view framed the page; absent when the view names none. */
+  readonly hostSessionId?: string;
+}
+
+/**
+ * One Mini App launch, as the runtime hands it over.
+ *
+ * Declared here rather than in `shared/contracts/` on purpose: `credential` is a
+ * live capability, and a shared contract is importable by the browser. Only the
+ * server and the runtime may name this type; the wire carries
+ * `WebuiMiniAppView`, which cannot express any of it.
+ */
+export interface WebuiMiniAppLaunch {
+  readonly miniApp: WebuiMiniAppSummary;
+  readonly launch: {
+    /** The Mini App's own loopback origin. Never forwarded to a renderer. */
+    readonly origin: string;
+    readonly surfacePath: string;
+    readonly runId: string;
+    /** The credential the Mini App's guard demands. Injected by the proxy. */
+    readonly credential: string;
+    /**
+     * Request header the guard reads it from. Carried with the credential so the
+     * server never spells the header name twice, and never spells it differently
+     * from the runtime that installed it.
+     */
+    readonly credentialHeader: string;
+  };
 }
 
 /**

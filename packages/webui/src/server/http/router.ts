@@ -73,7 +73,12 @@ export async function serveHttpRequest(
   const name =
     url.pathname === "/" ||
     url.pathname === "/index.html" ||
-    url.pathname === "/archon"
+    url.pathname === "/archon" ||
+    // A standalone Mini App is an ordinary client document; ADR 0020 gives it a
+    // route of its own (`/miniapp?plugin=&session=`) and the shell decides what
+    // it renders. Mapping it here is what makes the deep link a page rather than
+    // a 404.
+    url.pathname === "/miniapp"
       ? "index.html"
       : url.pathname === "/client.js"
         ? "client.js"

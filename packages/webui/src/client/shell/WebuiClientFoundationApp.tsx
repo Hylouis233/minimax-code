@@ -71,6 +71,7 @@ import { WebuiPortSlicesProvider } from "../bindings/port-slices-context.js";
 import { WebuiApplicationProvider } from "../bindings/application-context.js";
 import { useWebuiBrowserCapabilities } from "../bindings/browser-capabilities.js";
 import { useWebuiApplicationOptional } from "../bindings/application-context.js";
+import { WebuiMiniAppWorkflowsProvider } from "../features/miniapp/bindings/use-miniapp-workflows.js";
 import {
   WebuiPluginWorkflowsProvider,
   WebuiSessionWorkflowsProvider,
@@ -280,6 +281,11 @@ export function WebuiClientFoundationApp(
     void settingsWorkflows.loadVersion();
   }, [runtimeVersion, settingsWorkflows]);
   const pluginWorkflows = application.pluginWorkflows;
+  // The Mini App business's owner: the catalogue, the views and the bridge's host
+  // half. Provided at the root because two surfaces read it — the plugin
+  // catalogue's apps area and the workspace panel's launcher — and neither may
+  // construct a second owner.
+  const miniAppWorkflows = application.miniAppWorkflows;
   // The composer's view of what is installed and what the agent can run. It is a
   // separate read model from `pluginWorkflows` on purpose: the `@` menu and the
   // plugin manager are two readers with two identities, so neither overwrites the
@@ -658,6 +664,64 @@ export function WebuiClientFoundationApp(
   // The panel/tab state belongs to the workspace business: the shell reads the
   // slice for the session it shows and dispatches; it owns neither.
   const workspacePanelOwner = workspaceQueries.panel;
+  const latestSelectedSessionId = useRef(selectedSessionId);
+  latestSelectedSessionId.current = selectedSessionId;
+  const presenterEpoch = useRef<string>();
+  const presenterRevision = useRef(0);
+  const presenterTask = useRef(0);
+  useEffect(() => {
+    let disposed = false;
+    const release = miniAppWorkflows.watchPresenter((intent) => {
+      if (presenterEpoch.current !== intent.epoch) {
+        presenterEpoch.current = intent.epoch;
+        presenterRevision.current = 0;
+      }
+      if (intent.revision <= presenterRevision.current) return;
+      presenterRevision.current = intent.revision;
+      const task = ++presenterTask.current;
+      if (intent.action === "close") {
+        for (const tab of workspacePanelOwner.stateFor(intent.sessionId).workspacePanel.tabs) {
+          if (tab.content.kind === "miniapp" && tab.content.pluginId === intent.pluginId) {
+            workspacePanelOwner.dispatch(intent.sessionId, { type: "close-tab", tabId: tab.id });
+          }
+        }
+        return;
+      }
+      dispatchShellSurface({ type: "show-conversation" });
+      selectSession(intent.sessionId);
+      if (typeof window !== "undefined")
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${sessionHash(intent.sessionId)}`,
+        );
+      void (async () => {
+        if (!(await miniAppWorkflows.awaitSelection(intent.sessionId))) return;
+        const alreadyOpen = workspacePanelOwner.stateFor(intent.sessionId).workspacePanel.tabs.some(
+          (tab) => tab.content.kind === "miniapp" && tab.content.pluginId === intent.pluginId,
+        );
+        const opened = alreadyOpen || (await miniAppWorkflows.open(intent.pluginId));
+        if (
+          disposed ||
+          presenterTask.current !== task ||
+          !opened ||
+          latestSelectedSessionId.current !== intent.sessionId
+        ) return;
+        workspacePanelOwner.dispatch(intent.sessionId, {
+          type: "open-tab",
+          kind: "miniapp",
+          sessionId: intent.sessionId,
+          pluginId: intent.pluginId,
+        });
+        workspacePanelOwner.dispatch(intent.sessionId, { type: "open-panel" });
+      })();
+    });
+    return () => {
+      disposed = true;
+      presenterTask.current += 1;
+      release();
+    };
+  }, [application, dispatchShellSurface, miniAppWorkflows, selectSession, workspacePanelOwner]);
   // ---- Rail activity: which sessions are running, and when each last moved.
   //
   // The runtime runs sessions in parallel -- `queue.dispatcher.ts` keeps one
@@ -814,6 +878,7 @@ export function WebuiClientFoundationApp(
     <WebuiAccountWorkflowsProvider workflows={accountWorkflows}>
     <WebuiModelsWorkflowsProvider workflows={modelsWorkflows}>
     <WebuiSettingsWorkflowsProvider workflows={settingsWorkflows}>
+    <WebuiMiniAppWorkflowsProvider workflows={miniAppWorkflows}>
     <WebuiPluginWorkflowsProvider workflows={pluginWorkflows}>
     <WebuiSessionWorkflowsProvider workflows={sessionWorkflows}>
     <WebuiApplicationProvider application={application}>
@@ -912,7 +977,7 @@ export function WebuiClientFoundationApp(
             data-webui-shell-region="surface"
             className="relative flex min-h-0 min-w-0 flex-1 flex-row"
           >
-            {pluginManagementArea ? <WebuiZoneBoundary zone="plugins"><PluginCatalogue initialArea={pluginManagementArea} onChatWithAgent={async (name) => {
+            {pluginManagementArea ? <WebuiZoneBoundary zone="plugins"><PluginCatalogue initialArea={pluginManagementArea} selectedSessionId={selectedSessionId} onChatWithAgent={async (name) => {
               // Plugin-chat creation is the same completion policy as the composer's
               // and the goal path's: it goes through the task use case, so the
               // admission reservation, the guarded transfer and the catalogue
@@ -1017,6 +1082,7 @@ export function WebuiClientFoundationApp(
     </WebuiApplicationProvider>
     </WebuiSessionWorkflowsProvider>
     </WebuiPluginWorkflowsProvider>
+    </WebuiMiniAppWorkflowsProvider>
     </WebuiSettingsWorkflowsProvider>
     </WebuiModelsWorkflowsProvider>
     </WebuiAccountWorkflowsProvider>

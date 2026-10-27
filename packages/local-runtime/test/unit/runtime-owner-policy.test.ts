@@ -143,6 +143,7 @@ describe('resolveRuntimeOwnerPolicy', () => {
         'browserActivation',
         'channelService',
         'cronService',
+        'miniAppService',
         'ownsV2Runtime',
         'schedulerHost',
       ]);
@@ -312,13 +313,15 @@ describe('resolveRuntimeOwnerPolicy', () => {
     expect(policy.execution.mavisFeatureBundle).toBe(true);
   });
 
-  it("'webui' resolves to its own row, which differs from tui in six cells", () => {
-    // Read as "where WebUI differs from tui": seven cells are inherited so an
+  it("'webui' resolves to its own row, which differs from tui in seven cells", () => {
+    // Read as "where WebUI differs from tui": the remaining cells are inherited so an
     // identity change does not silently move turn-execution semantics.
     //
     // Compared as the two clients actually declare today: `tui` still carries
     // capabilityProfile 'cli', while the webui row sets mavisFeatureBundle explicitly.
-    // That is why it is one of the six differences rather than an inherited cell.
+    // That is why it is one of the differences rather than an inherited cell.
+    // `miniAppService` is another: it is enabled here because the presenter, the view
+    // and the cell landed together (ADR 0020), and `tui` has no Mini App surface at all.
     const webui = policyFor({
       kind: 'webui',
       cliEmbedded: true,
@@ -344,13 +347,15 @@ describe('resolveRuntimeOwnerPolicy', () => {
         'execution.memoryFeature',
         'execution.restricted',
         'wiring.cronService',
+        'wiring.miniAppService',
         'wiring.schedulerHost',
       ].sort(),
     );
-    // The six differences themselves, asserted so the count is not the only check.
+    // The differences themselves, asserted so the count is not the only check.
     expect(webui.wiring.ownsV2Runtime).toBe(true);
     expect(webui.wiring.schedulerHost).toBe(true);
     expect(webui.wiring.cronService).toBe(true);
+    expect(webui.wiring.miniAppService).toBe(true);
     expect(webui.wiring.channelService).toBe(false);
     expect(webui.wiring.browserActivation).toBe('explicit-config');
     expect(webui.execution.restricted).toBe(false);

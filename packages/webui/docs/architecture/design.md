@@ -191,13 +191,13 @@ One declaration, three consumers, and a compiler that keeps them agreeing:
    can choose a member: group, method and operation name are fixed in the declaration, and the argument
    tuple and the result mapper are checked against that method's parameters and the operation's
    response type. No `any`, no assertion, no non-null assertion — a wrong group, method, tuple or
-   mapper fails to compile. The thirteen operations that shape a response, degrade when a capability is
+   mapper fails to compile. The sixteen operations that shape a response, degrade when a capability is
    absent, or carry a stream, terminal or command shape keep hand-written handlers in
    `src/server/operation/handlers/`.
 4. **`src/runtime/port.ts`** declares `WebuiHarnessPort`: one method per operation, typed with the
    `shared/contracts/<domain>.ts` DTOs, and implemented under `src/runtime/harness/` by
    `createHarnessPortFromHost`. `bind-handlers.ts` derives its `Pick` from the port, so the roster and
-   the registry cannot drift: the counts are pinned by tests (86 bindings, 13 handlers, 99 operations),
+   the registry cannot drift: the counts are pinned by tests (93 bindings, 16 handlers, 109 operations),
    and a change that adds or drops one stops `pnpm typecheck:webui` compiling until the roster
    moves as a unit.
 

@@ -30,7 +30,15 @@ export {
   type WebuiOperationResult,
 } from "./operation/operations.js";
 export {
-  createWebuiCredential,
+  createMiniAppProxyRegistry,
+  type MiniAppProxyRegistry,
+} from "./miniapp/proxy-registry.js";
+export {
+  createMiniAppPresenter,
+  followSelection,
+  type MiniAppPresenterView,
+} from "./miniapp/presenter.js";
+export { createWebuiCredential,
   credentialMatches,
   type WebuiCredential,
 } from "./credentials.js";

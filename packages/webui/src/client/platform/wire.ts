@@ -15,6 +15,14 @@
 
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
+import type {
+  WebuiMiniAppPresentationIntent,
+  WebuiMiniAppPresentationState,
+} from "../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "../../shared/contracts/miniapp-agent.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
@@ -162,8 +170,51 @@ export interface WebuiWire {
     requestBody: { readonly surface: WebuiBrowserSurface },
     onSnapshot: (snapshot: WebuiBrowserWebTabSnapshot) => void,
   ): () => void;
+  /**
+   * The standalone presentation lease (ADR 0020).
+   *
+   * A watch rather than a request because the lease's lifetime *is* the socket's:
+   * the service releases the record when this connection closes, which is what
+   * makes a standalone tab's presentation end when the tab does. The returned
+   * function is the release.
+   */
+  watchMiniAppPresentation(
+    operation: string,
+    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  watchMiniAppPresenter(
+    operation: string,
+    onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  /**
+   * One followed Mini App turn, as a stream.
+   *
+   * The settlement arrives as the stream's last frame rather than as the socket's
+   * closing: `settled` carries the turn's result and `failure` its code, so a page
+   * always learns how the call ended instead of inferring it from a drop.
+   */
+  watchMiniAppAgentTurn(
+    operation: string,
+    requestBody: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
   /** The one HTTP route, built from the same base and token as the socket. */
   workspaceFileUrl(input: { readonly workspaceDir: string; readonly path: string }): string;
+  /**
+   * The standalone Mini App's page, built from the same base and token.
+   *
+   * The page route is admitted like every other document — the service checks the
+   * token on an `index.html` read — so the link carries it. The plugin and the
+   * session ride the query because they are the deep link's whole content.
+   */
+  miniappStandaloneUrl(input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): string;
   /**
    * The process-event socket. It belongs to the wire rather than to the table
    * because it is a long-lived socket with its own reconnect policy, not a
@@ -515,6 +566,209 @@ export function createWebuiWire({
     };
   }
 
+  /**
+   * The standalone presentation lease: one frame, then the socket stays open.
+   *
+   * The same shape as the terminal and browser watches, and for the same reason —
+   * a stop must not deliver, and `close()` is not a promise that the socket stops
+   * emitting. What differs is what the open socket *means*: the service holds the
+   * lease while it lives, so closing this watch is the release.
+   */
+  function watchMiniAppPresentation(
+    operation: string,
+    requestBody: { readonly pluginId: string; readonly sessionId: string },
+    onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    let session: WebuiWireSession | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryDelayMs = 250;
+    let failureReported = false;
+    const reconnect = (currentSession: WebuiWireSession | undefined, error: Error): void => {
+      if (stopped) return;
+      if (retryTimer !== undefined) return;
+      if (!failureReported) {
+        failureReported = true;
+        onFailure?.(error);
+      }
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        if (stopped) return;
+        open();
+        retryDelayMs = Math.min(retryDelayMs * 2, 5_000);
+      }, retryDelayMs);
+      currentSession?.close();
+    };
+    const open = (): void => {
+      session = openWireSession(operation, requestBody, {
+      frame: (currentSession, frame) => {
+        if (stopped) return;
+        if (frame.kind === "error") {
+          // A refusal is a failure, not an absent lease: the service could not
+          // establish the presentation, and saying "no lease" would let the
+          // caller read a broken host as a closed tab. The socket is closed with
+          // it, because nothing is being held on the other end.
+          stopped = true;
+          currentSession.close();
+          onFailure?.(
+            new WebuiWireError(
+              frame.code,
+              frame.message ?? `${operation} refused`,
+              frame.requestId,
+            ),
+          );
+          return;
+        }
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        failureReported = false;
+        if (stableTimer !== undefined) clearTimeout(stableTimer);
+        stableTimer = setTimeout(() => {
+          stableTimer = undefined;
+          retryDelayMs = 250;
+        }, 10_000);
+        onFrame(frame.body as WebuiMiniAppPresentationState);
+      },
+      invalidFrame: (currentSession, reason) => {
+        reconnect(currentSession, rejectionError(reason, operation));
+      },
+      closed: (currentSession) =>
+        reconnect(currentSession, new WebuiWireError("runtime_unavailable", `${operation} connection closed`)),
+      failed: (currentSession) =>
+        reconnect(currentSession, new WebuiWireError("runtime_unavailable", `${operation} connection failed`)),
+      });
+    };
+    open();
+    return () => {
+      stopped = true;
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      if (stableTimer !== undefined) clearTimeout(stableTimer);
+      session?.close();
+    };
+  }
+
+  function watchMiniAppAgentTurn(
+    operation: string,
+    requestBody: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    const transportFailure = (session: WebuiWireSession, message: string): void => {
+      if (stopped) return;
+      stopped = true;
+      session.close();
+      onFailure?.(new WebuiWireError("result_unknown", message));
+    };
+    const session = openWireSession(operation, requestBody, {
+      frame: (session, frame) => {
+        if (stopped) return;
+        if (frame.kind === "error") {
+          // The service refused the turn before running it, or the stream broke.
+          // Either way this turn is over: the caller decides what the code means.
+          stopped = true;
+          session.close();
+          onFailure?.(
+            new WebuiWireError(
+              frame.code,
+              frame.message ?? `${operation} refused`,
+              frame.requestId,
+            ),
+          );
+          return;
+        }
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        const decoded = frame.body as WebuiMiniAppAgentTurnFrame;
+        // The settlement is the last frame; nothing after it belongs to this turn.
+        if (decoded.kind === "settled" || decoded.kind === "failure") stopped = true;
+        onFrame(decoded);
+      },
+      invalidFrame: (session) =>
+        transportFailure(session, `${operation} returned an invalid turn frame`),
+      closed: (session) =>
+        transportFailure(session, `${operation} connection closed before settlement`),
+      failed: (session) =>
+        transportFailure(session, `${operation} connection failed before settlement`),
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
+  function watchMiniAppPresenter(
+    operation: string,
+    onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    let session: WebuiWireSession | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let delayMs = 250;
+    let failureReported = false;
+    const reconnect = (current: WebuiWireSession, error: Error): void => {
+      if (stopped || retryTimer !== undefined) return;
+      if (!failureReported) {
+        failureReported = true;
+        onFailure?.(error);
+      }
+      current.close();
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        if (!stopped) open();
+        delayMs = Math.min(delayMs * 2, 5_000);
+      }, delayMs);
+    };
+    const open = (): void => {
+      session = openWireSession(operation, undefined, {
+        frame: (current, frame) => {
+          if (stopped) return;
+          if (frame.kind === "error") {
+            stopped = true;
+            current.close();
+            onFailure?.(new WebuiWireError(frame.code, frame.message ?? `${operation} refused`));
+            return;
+          }
+          if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+          failureReported = false;
+          if (stableTimer !== undefined) clearTimeout(stableTimer);
+          stableTimer = setTimeout(() => {
+            stableTimer = undefined;
+            delayMs = 250;
+          }, 10_000);
+          onFrame(frame.body as WebuiMiniAppPresentationIntent);
+        },
+        invalidFrame: (current, reason) => reconnect(current, rejectionError(reason, operation)),
+        closed: (current) => reconnect(current, new WebuiWireError("runtime_unavailable", `${operation} connection closed`)),
+        failed: (current) => reconnect(current, new WebuiWireError("runtime_unavailable", `${operation} connection failed`)),
+      });
+    };
+    open();
+    return () => {
+      stopped = true;
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      if (stableTimer !== undefined) clearTimeout(stableTimer);
+      session?.close();
+    };
+  }
+
+  function miniappStandaloneUrl({
+    pluginId,
+    sessionId,
+  }: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+  }): string {
+    // Same base rule as `workspaceFileUrl`: the socket URL carries the token, the
+    // page route checks it, and `ws:`/`wss:` share a prefix so one substitution
+    // reaches `http:`/`https:`.
+    const base = baseWebsocketUrl.replace(/\/$/u, "").replace(/^ws/iu, "http");
+    const query = new URLSearchParams({ token, plugin: pluginId, session: sessionId });
+    return `${base}/miniapp?${query.toString()}`;
+  }
+
   function workspaceFileUrl({
     workspaceDir,
     path: filePath,
@@ -536,7 +790,11 @@ export function createWebuiWire({
     watchTerminal,
     watchBrowserFrames,
     watchBrowserWebTabs,
+    watchMiniAppPresentation,
+    watchMiniAppPresenter,
+    watchMiniAppAgentTurn,
     workspaceFileUrl,
+    miniappStandaloneUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
   };
 }
