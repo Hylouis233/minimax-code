@@ -36,6 +36,10 @@ import {
   type MiniAppProxyRegistry,
 } from "../../miniapp/proxy-registry.js";
 import { createMiniAppPresentationLeases } from "../../miniapp/presentation-lease.js";
+import {
+  createMiniAppAgentConnections,
+  type MiniAppAgentConnections,
+} from "../../miniapp/agent-connections.js";
 import { miniAppPageBridge } from "../../miniapp/bridge.js";
 import type {
   WebuiMiniAppCatalogue,
@@ -107,6 +111,15 @@ export interface MiniAppHandlerOptions {
    * fails to bind. With none, this handler owns a private registry.
    */
   readonly proxies?: MiniAppProxyRegistry;
+  /**
+   * The presentations this service is serving, shared with the agent handlers.
+   *
+   * A start records the launch's process generation here and a stop drops it; the
+   * page bridge then refuses a call whose generation is not the live one. Passed in
+   * rather than created per handler set because both halves must read one record —
+   * with none, this handler keeps a private one, which is what a test gets.
+   */
+  readonly connections?: MiniAppAgentConnections;
 }
 
 /**
@@ -194,6 +207,8 @@ export function createMiniAppHandlerEntries(
    * sharing one.
    */
   const presentations = createMiniAppPresentationLeases();
+  /** Which generation of each plugin's page is the one being served. */
+  const connections = options.connections ?? createMiniAppAgentConnections();
 
   /**
    * Whether the deep link's session is still there.
@@ -318,10 +333,20 @@ export function createMiniAppHandlerEntries(
           credential: launch.launch.credential,
           credentialHeader: launch.launch.credentialHeader,
         });
-        // The response is the proxy's URL and the plugin it belongs to. The
-        // runtime's origin, surface path and credential stay in this frame of
-        // reference — no field of `launch` is copied out.
-        return { body: { pluginId: launch.miniApp.pluginId, viewUrl: proxy.viewUrl } };
+        // The response is the proxy's URL, the plugin it belongs to, and the
+        // generation this start issued. The runtime's origin, surface path,
+        // credential and process generation stay in this frame of reference.
+        const binding = connections.register({
+          pluginId: launch.miniApp.pluginId,
+          runId: launch.launch.runId,
+        });
+        return {
+          body: {
+            pluginId: launch.miniApp.pluginId,
+            viewUrl: proxy.viewUrl,
+            connection: binding.connection,
+          },
+        };
       } catch (error) {
         // The runtime started something the client cannot reach. Stopping it is
         // better than leaving a process running with no way into it, and the
@@ -348,6 +373,9 @@ export function createMiniAppHandlerEntries(
         signal: context.signal,
       });
       await closeProxy(body.pluginId);
+      // The page is gone with its listener, so nothing may act as this plugin any
+      // more: the next start is a new generation and a stale request fails closed.
+      connections.revoke(body.pluginId);
       return { body: { success: true as const } };
     });
   };

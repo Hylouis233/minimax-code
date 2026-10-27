@@ -176,6 +176,26 @@ export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
 export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
 export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
 export const WATCH_MINI_APP_PRESENTATION_OPERATION_NAME = "watchMiniAppPresentation" as const;
+/**
+ * One followed Mini App turn (`run` / `answer`).
+ *
+ * A stream because the turn streams: its progress events and its terminal result
+ * arrive on one socket, and the socket closing is the only thing that ends a turn
+ * nobody settled. `observe` travels in the body because the transport being a
+ * stream says nothing about whether the page is listening (see
+ * `shared/contracts/miniapp-agent.ts`).
+ */
+export const WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME = "watchMiniAppAgentTurn" as const;
+/**
+ * One short Mini App agent call: `models`, `agents`, `create`, `reply`, `open`, the
+ * two panel reports, and `cancel`.
+ *
+ * One operation rather than eight because they share a body, a caller and one
+ * refusal envelope, and each answers with the `method` it names. A page's
+ * cancellation also belongs here: it is a call naming a request, not a socket
+ * being dropped.
+ */
+export const MINI_APP_AGENT_CALL_OPERATION_NAME = "miniAppAgentCall" as const;
 
 import type {
   WebuiActiveTurnResult,
@@ -313,6 +333,12 @@ import type {
   WebuiMiniAppPresentationState,
   WebuiMiniAppView,
 } from "./contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentCallRequest,
+  WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "./contracts/miniapp-agent.js";
 
 /**
  * The complete operation table: every wire operation name mapped to the
@@ -809,6 +835,23 @@ export interface OperationSpec {
     request: { readonly pluginId: string; readonly sessionId: string };
     response: WebuiMiniAppPresentationStreamEnvelope;
   };
+  /**
+   * One followed Mini App turn.
+   *
+   * The body is the page's request plus the identity the host resolved for it; the
+   * frames are its progress events and, last, how it settled. A turn's refusal is a
+   * frame rather than a wire error, because "the runtime said no" and "the request
+   * was malformed" are different answers and only the second one is the wire's.
+   */
+  watchMiniAppAgentTurn: {
+    request: WebuiMiniAppAgentTurnRequest;
+    response: WebuiMiniAppAgentTurnStreamEnvelope;
+  };
+  /** One short Mini App agent call, refusal included in the body. */
+  miniAppAgentCall: {
+    request: WebuiMiniAppAgentCallRequest;
+    response: WebuiMiniAppAgentCallResponse;
+  };
 }
 
 /**
@@ -830,6 +873,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
 ] as const;
 
 export type WebuiStreamOperationName = (typeof WEBUI_STREAM_OPERATION_NAMES)[number];
@@ -883,6 +927,21 @@ export interface WebuiMiniAppPresentationStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiMiniAppPresentationState>;
+  };
+}
+
+/**
+ * The `{ stream }` envelope for one followed Mini App turn.
+ *
+ * Frames are the runtime's own run events, then exactly one settlement: `settled`
+ * with the turn's result, or `failure` with a closed failure code. The settlement
+ * is the promise's answer, which is why it is a frame of the same stream rather
+ * than a second request.
+ */
+export interface WebuiMiniAppAgentTurnStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppAgentTurnFrame>;
   };
 }
 

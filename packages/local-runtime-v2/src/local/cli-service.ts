@@ -118,6 +118,9 @@ export interface CliServiceOptions {
 export type CliSendMessageReq = ConversationSendMessageRequest;
 export type CliSendMessageOptions = ConversationSendOptions;
 
+/** The runtime's Mini App Agent application, named once so the facade's signatures derive from it. */
+type MiniAppAgentCapability = NonNullable<LocalRuntimeApplication["miniAppAgent"]>;
+
 /** In-process CLI entry point: call local Application directly, without HTTP or RPC envelopes. */
 export class CliService {
   constructor(private readonly options: CliServiceOptions) {}
@@ -195,6 +198,71 @@ export class CliService {
 
   stopMiniApp(input: { readonly pluginId: string; readonly signal?: AbortSignal }) {
     return this.requireCapability("miniApps", "Mini App").stop(input);
+  }
+
+  /**
+   * The Mini App Agent API, as the page bridge's host half reaches it.
+   *
+   * A forwarding facade only: the application (`miniAppAgent`) already owns arena policy,
+   * per-plugin concurrency, session ownership and the turn algorithm, and every one of these
+   * methods is one call into it. What the caller must not do is spell identity — `caller` is the
+   * `{ pluginId, runId, hostSessionId }` the Host resolved from the view it framed, and `runId` is
+   * the launch's own process generation, because that is what the registered arena is keyed on.
+   *
+   * The refusal is the runtime's own `MiniAppAgentError`; mapping it to a renderer-safe failure
+   * code belongs to the layer that speaks to a page, not here.
+   */
+  private miniAppAgent() {
+    return this.requireCapability("miniAppAgent", "Mini App Agent");
+  }
+
+  /** One `run` turn. Events arrive only when the caller passes `onEvent`. */
+  runMiniAppAgentTurn(input: Parameters<MiniAppAgentCapability["run"]>[0]) {
+    return this.miniAppAgent().run(input);
+  }
+
+  /** The continuation turn a questionnaire answer starts; followed like `run`. */
+  answerMiniAppAgentQuestion(input: Parameters<MiniAppAgentCapability["answer"]>[0]) {
+    return this.miniAppAgent().answer(input);
+  }
+
+  /** Decides one pending permission ask: `allowOnce` or `deny`, never a global rule. */
+  replyMiniAppAgentPermission(input: Parameters<MiniAppAgentCapability["reply"]>[0]) {
+    return this.miniAppAgent().reply(input);
+  }
+
+  /** Ownership check for showing one of the plugin's sessions in the host's chat surface. */
+  openMiniAppAgentSession(input: Parameters<MiniAppAgentCapability["open"]>[0]) {
+    return this.miniAppAgent().open(input);
+  }
+
+  /** The host's UI now shows that session, so its asks are answerable. Idempotent. */
+  panelOpenedMiniAppAgentSession(
+    input: Parameters<MiniAppAgentCapability["panelOpened"]>[0],
+  ) {
+    return this.miniAppAgent().panelOpened(input);
+  }
+
+  /** The host's UI stopped showing it. Idempotent. */
+  panelClosedMiniAppAgentSession(
+    input: Parameters<MiniAppAgentCapability["panelClosed"]>[0],
+  ) {
+    return this.miniAppAgent().panelClosed(input);
+  }
+
+  /** The enabled models a run may switch to, the default, and a page's host model. */
+  listMiniAppAgentModels(input: Parameters<MiniAppAgentCapability["models"]>[0]) {
+    return this.miniAppAgent().models(input);
+  }
+
+  /** The agents a new Mini App session may be created for. */
+  listMiniAppAgentAgents(input: Parameters<MiniAppAgentCapability["agents"]>[0]) {
+    return this.miniAppAgent().agents(input);
+  }
+
+  /** A session without a turn; `runMiniAppAgentTurn({ sessionId })` continues it. */
+  createMiniAppAgentSession(input: Parameters<MiniAppAgentCapability["create"]>[0]) {
+    return this.miniAppAgent().create(input);
   }
 
   clearSessionMcpServers(sessionId: string): Promise<void> {

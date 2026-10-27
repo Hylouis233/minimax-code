@@ -28,6 +28,9 @@ import {
 } from "./bind-handlers.js";
 import { createWorkspaceHandlerEntries } from "./handlers/workspace.js";
 import { createMiniAppHandlerEntries } from "./handlers/miniapp.js";
+import { createMiniAppAgentHandlerEntries } from "./handlers/miniapp-agent.js";
+import { createMiniAppAgentConnections } from "../miniapp/agent-connections.js";
+import { createMiniAppAgentRuns } from "../miniapp/agent-runs.js";
 import { createTerminalHandlerEntries } from "./handlers/terminal.js";
 import {
   createBrowserHandlerEntries,
@@ -97,6 +100,15 @@ export function createOperationRegistry(
   miniAppProxies?: MiniAppProxyRegistry,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
+  /**
+   * The Mini App page bridge's two records, shared by both handler sets.
+   *
+   * One set starts and stops presentations and therefore records generations; the
+   * other answers a page's calls and checks them against those generations. Two
+   * instances would be two answers to "is this page the live one".
+   */
+  const miniAppConnections = createMiniAppAgentConnections();
+  const miniAppRuns = createMiniAppAgentRuns();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
     ...createBindingEntries(port),
     ...createWorkspaceHandlerEntries(),
@@ -104,7 +116,14 @@ export function createOperationRegistry(
     ...createAccountHandlerEntries(port),
     ...createStreamHandlerEntries(port),
     ...createMessageHandlerEntries(port),
-    ...createMiniAppHandlerEntries(port, miniAppProxies ? { proxies: miniAppProxies } : {}),
+    ...createMiniAppHandlerEntries(port, {
+      ...(miniAppProxies ? { proxies: miniAppProxies } : {}),
+      connections: miniAppConnections,
+    }),
+    ...createMiniAppAgentHandlerEntries(port, {
+      connections: miniAppConnections,
+      runs: miniAppRuns,
+    }),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
     ...(browser ? createBrowserHandlerEntries(browser, browserInstallationKeys) : []),
   ]);
@@ -287,6 +306,9 @@ export function createOperationRegistry(
   registerOperation(registry, entry("openMiniApp"));
   registerOperation(registry, entry("stopMiniApp"));
   registerOperation(registry, entry("watchMiniAppPresentation"));
+  // The page bridge, appended so the registry order before it is unchanged.
+  registerOperation(registry, entry("watchMiniAppAgentTurn"));
+  registerOperation(registry, entry("miniAppAgentCall"));
   return registry;
 }
 

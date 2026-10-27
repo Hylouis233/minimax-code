@@ -1,3 +1,12 @@
+import type {
+  MiniAppAgentAgents,
+  MiniAppAgentModelSelection,
+  MiniAppAgentModels,
+  MiniAppAgentPermissionDecision,
+  MiniAppAgentRunEvent,
+  MiniAppAgentRunResult,
+} from "@mavis/shared/miniapp-surface";
+import type { AskQuestionnaireReplyAnswer } from "@mavis/shared/questionnaire";
 import type { WebuiPluginManagementRequest } from "../shared/plugin-management.js";
 import type {
   WebuiRunCommandRequest,
@@ -605,6 +614,81 @@ export interface WebuiHarnessPort {
     readonly signal?: AbortSignal;
   }): Promise<void>;
   /**
+   * The Mini App Agent API: what a page's `window.mcode.miniapp.agent` reaches.
+   *
+   * One capability with nine members, all optional together — a host composed
+   * without `miniAppAgent` has none of them, and the operations answer
+   * `capability_unavailable` rather than pretending a turn happened. `caller` is
+   * always the identity the service resolved for the page: never page-supplied.
+   */
+  runMiniAppAgentTurn?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly text: string;
+    /** Continue one of the plugin's sessions; absent creates one. */
+    readonly sessionId?: string;
+    /** Only when creating: the agent the session is bound to. */
+    readonly agent?: string;
+    readonly model?: MiniAppAgentModelSelection;
+    readonly signal?: AbortSignal;
+    /**
+     * The page's event listener, present only when the page asked to observe.
+     *
+     * The runtime counts a subscribed run as the party able to answer its
+     * permission and questionnaire asks, so a call with no listener must arrive
+     * with none: attaching one to collect the result would make every ask wait on
+     * a page that is not reading.
+     */
+    readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+  }): Promise<MiniAppAgentRunResult>;
+  /** The continuation turn a questionnaire answer starts; followed like a run. */
+  answerMiniAppAgentQuestion?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+    readonly requestId: string;
+    readonly answers: readonly AskQuestionnaireReplyAnswer[];
+    readonly model?: MiniAppAgentModelSelection;
+    readonly signal?: AbortSignal;
+    readonly onEvent?: (event: MiniAppAgentRunEvent) => void;
+  }): Promise<MiniAppAgentRunResult>;
+  /** Decides one pending permission ask. `allowOnce` or `deny`, never a global rule. */
+  replyMiniAppAgentPermission?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+    readonly requestId: string;
+    readonly decision: MiniAppAgentPermissionDecision;
+  }): Promise<void>;
+  /**
+   * Proves the plugin owns the session and that the caller has a host session to
+   * show it in. Showing it is the UI's act and is reported separately.
+   */
+  openMiniAppAgentSession?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly sessionId: string;
+  }): Promise<{ readonly sessionId: string; readonly hostSessionId: string }>;
+  /** The UI now shows that session, so its asks are answerable. Idempotent. */
+  panelOpenedMiniAppAgentSession?(input: {
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+  }): Promise<void>;
+  /** The UI stopped showing it. Idempotent. */
+  panelClosedMiniAppAgentSession?(input: {
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+  }): Promise<void>;
+  /** The models a run may switch to, the default, and a page's host model. */
+  listMiniAppAgentModels?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+  }): Promise<MiniAppAgentModels>;
+  /** The agents a new Mini App session may be created for. */
+  listMiniAppAgentAgents?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+  }): Promise<MiniAppAgentAgents>;
+  /** A session without a turn; a `run` naming it continues it. */
+  createMiniAppAgentSession?(input: {
+    readonly caller: WebuiMiniAppAgentCaller;
+    readonly agent?: string;
+  }): Promise<{ readonly sessionId: string }>;
+  /**
    * Release anything the port owns. The service calls this after closing
    * every transport-side resource so the harness can tear itself down in
    * the required order.
@@ -621,6 +705,22 @@ export interface WebuiHarnessPort {
  * what keeps "this host has no Mini Apps" recognisable to a client regardless of
  * which of the two noticed it.
  */
+/**
+ * The identity one Mini App page's call runs as.
+ *
+ * Resolved by the service from the presentation it issued — the plugin, the host
+ * session the view belongs to, and the launch's own process generation — and never
+ * taken from page content. `runId` is the launch's `runId`: the value the runtime
+ * keys a Mini App's registered arena on, so a page caller shares the arena its own
+ * process registered.
+ */
+export interface WebuiMiniAppAgentCaller {
+  readonly pluginId: string;
+  readonly runId: string;
+  /** The session whose view framed the page; absent when the view names none. */
+  readonly hostSessionId?: string;
+}
+
 export const MINIAPP_CAPABILITY_ABSENT =
   "runtime host does not expose the Mini App capability";
 

@@ -140,6 +140,8 @@ import {
   OPEN_MINI_APP_OPERATION_NAME,
   STOP_MINI_APP_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
+  MINI_APP_AGENT_CALL_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
@@ -163,6 +165,7 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchBrowserFrames,
     watchBrowserWebTabs,
     watchMiniAppPresentation,
+    watchMiniAppAgentTurn,
     workspaceFileUrl,
     miniappStandaloneUrl,
     watchEvents,
@@ -273,6 +276,9 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     stopMiniApp: (body) => request(STOP_MINI_APP_OPERATION_NAME, body),
     watchMiniAppPresentation: (body, onFrame, onFailure) =>
       watchMiniAppPresentation(WATCH_MINI_APP_PRESENTATION_OPERATION_NAME, body, onFrame, onFailure),
+    watchMiniAppAgentTurn: (body, onFrame, onFailure) =>
+      watchMiniAppAgentTurn(WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME, body, onFrame, onFailure),
+    miniAppAgentCall: (body) => request(MINI_APP_AGENT_CALL_OPERATION_NAME, body),
     miniappStandaloneUrl,
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>

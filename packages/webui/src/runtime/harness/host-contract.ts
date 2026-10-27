@@ -601,6 +601,23 @@ export interface WebuiRuntimeCliService {
   stopMiniApp?(
     request: WebuiHostRequest<"stopMiniApp">,
   ): Promise<HostResult<"stopMiniApp">>;
+  /**
+   * The Mini App Agent facade.
+   *
+   * Present together or absent together: the runtime composes all nine from one
+   * application cell, so a host with two of them is broken rather than partial and
+   * the adapter refuses all nine. The parameter shapes are the facade's own
+   * (`CliService`), including the `caller` the service resolved for the page.
+   */
+  runMiniAppAgentTurn?: CliService["runMiniAppAgentTurn"];
+  answerMiniAppAgentQuestion?: CliService["answerMiniAppAgentQuestion"];
+  replyMiniAppAgentPermission?: CliService["replyMiniAppAgentPermission"];
+  openMiniAppAgentSession?: CliService["openMiniAppAgentSession"];
+  panelOpenedMiniAppAgentSession?: CliService["panelOpenedMiniAppAgentSession"];
+  panelClosedMiniAppAgentSession?: CliService["panelClosedMiniAppAgentSession"];
+  listMiniAppAgentModels?: CliService["listMiniAppAgentModels"];
+  listMiniAppAgentAgents?: CliService["listMiniAppAgentAgents"];
+  createMiniAppAgentSession?: CliService["createMiniAppAgentSession"];
 }
 
 export interface WebuiRuntimeHostHandle {

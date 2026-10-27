@@ -137,6 +137,15 @@ export type WebuiOperationPort = Pick<
   | "listMiniApps"
   | "openMiniApp"
   | "stopMiniApp"
+  | "runMiniAppAgentTurn"
+  | "answerMiniAppAgentQuestion"
+  | "replyMiniAppAgentPermission"
+  | "openMiniAppAgentSession"
+  | "panelOpenedMiniAppAgentSession"
+  | "panelClosedMiniAppAgentSession"
+  | "listMiniAppAgentModels"
+  | "listMiniAppAgentAgents"
+  | "createMiniAppAgentSession"
   | "runCommand"
 >;
 

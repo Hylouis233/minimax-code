@@ -25,6 +25,12 @@ import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppCatalogueRow,
 } from "../../../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentCallRequest,
+  WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "../../../../shared/contracts/miniapp-agent.js";
 import type { MiniAppPort } from "../contracts/miniapp-port.js";
 import {
   webuiMiniAppRows,
@@ -35,7 +41,13 @@ import {
 /** The port members this business drives: its own five, and the package lifecycle. */
 export type WebuiMiniAppPortSlice = Pick<
   MiniAppPort,
-  "listMiniApps" | "openMiniApp" | "stopMiniApp" | "watchMiniAppPresentation" | "miniappStandaloneUrl"
+  | "listMiniApps"
+  | "openMiniApp"
+  | "stopMiniApp"
+  | "watchMiniAppPresentation"
+  | "miniappStandaloneUrl"
+  | "watchMiniAppAgentTurn"
+  | "miniAppAgentCall"
 > &
   Pick<PluginPort, "pluginManagement">;
 
@@ -49,7 +61,18 @@ export type WebuiMiniAppPortSlice = Pick<
  */
 export type WebuiMiniAppPresentation =
   | { readonly kind: "opening" }
-  | { readonly kind: "open"; readonly viewUrl: string }
+  | {
+      readonly kind: "open";
+      readonly viewUrl: string;
+      /**
+       * The generation the service issued for this start.
+       *
+       * Every page-bridge call echoes it, so a request from a replaced frame is
+       * refused by the service rather than answered as the live one. It is the
+       * client's fencing key and the server's, and it is per start, not per plugin.
+       */
+      readonly connection: number;
+    }
   | { readonly kind: "stopped"; readonly reason: string };
 
 /** A structural refusal, kept under the plugin it was about. */
@@ -110,6 +133,21 @@ export interface WebuiMiniAppWorkflowsState {
    * than deduced by each surface from a missing port member.
    */
   readonly unavailable?: string;
+  /**
+   * The Mini App session the rail is showing because a page asked to see it.
+   *
+   * "Shown" is a claim about the client's selection, so it is recorded only after
+   * the view selected the session and the service was told. When the person
+   * leaves that session this is what makes the close report possible — and a
+   * session nobody shows must not stay answerable, or its permission asks wait on
+   * a panel that is gone.
+   */
+  readonly agentShown?: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+    readonly connection: number;
+  };
 }
 
 export const initialWebuiMiniAppListing: WebuiMiniAppListing = {
@@ -206,6 +244,41 @@ export interface WebuiMiniAppWorkflows {
     readonly sessionId: string;
   }) => () => void;
 
+  /**
+   * One followed turn for a page: the transport is the stream, `observe` is the
+   * page's own claim and travels inside the body.
+   */
+  readonly watchAgentTurn: (
+    request: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure: (error: Error) => void,
+  ) => () => void;
+  /** One short call. A host without the capability answers `runtime_unavailable`. */
+  readonly agentCall: (
+    request: WebuiMiniAppAgentCallRequest,
+  ) => Promise<WebuiMiniAppAgentCallResponse>;
+  /**
+   * Report that the client now shows `sessionId` for `pluginId`.
+   *
+   * Called after the rail has actually selected it, never on the capability call:
+   * the runtime treats a shown session as answerable, so claiming it early makes
+   * its asks wait on a panel that is not on screen.
+   */
+  readonly reportShown: (input: {
+    readonly pluginId: string;
+    readonly sessionId: string;
+    readonly hostSessionId: string;
+    readonly connection: number;
+  }) => Promise<void>;
+  /**
+   * The selection the shell resolved.
+   *
+   * Leaving the shown session is the close report; staying on it changes nothing.
+   * The call is idempotent because a selection can be re-announced.
+   */
+  readonly noteSelectedSession: (sessionId: string | undefined) => void;
+  /** The view is gone: nothing shows it any more, so stop counting it as shown. */
+  readonly releaseShown: (pluginId: string) => void;
   /** Package lifecycle, for the catalogue's apps area. */
   readonly setPluginEnabled: (pluginId: string, enabled: boolean) => Promise<void>;
   readonly uninstall: (pluginId: string) => Promise<void>;
@@ -293,7 +366,11 @@ export function createWebuiMiniAppWorkflows(deps: {
     setRefusal(pluginId, undefined);
     try {
       const view = await port.openMiniApp({ pluginId });
-      setPresentation(pluginId, { kind: "open", viewUrl: view.viewUrl });
+      setPresentation(pluginId, {
+        kind: "open",
+        viewUrl: view.viewUrl,
+        connection: view.connection ?? 0,
+      });
       // The catalogue can open a Mini App without mounting its panel view, so
       // nothing else would refresh the runtime status after a successful start.
       await loadListing();
@@ -455,6 +532,78 @@ export function createWebuiMiniAppWorkflows(deps: {
     return (await open(pluginId)) ? "presented" : "blocked";
   };
 
+  /**
+   * One page turn.
+   *
+   * A host without the member — an older client, a runtime composed without the
+   * agent application — answers a documented code instead of a promise nobody
+   * settles. The refusal is delivered through `onFailure` so both paths settle the
+   * page's call the same way.
+   */
+  const watchAgentTurn: WebuiMiniAppWorkflows["watchAgentTurn"] = (request, onFrame, onFailure) => {
+    if (!request.hostSessionId) {
+      onFailure(Object.assign(new Error("not_permitted"), { code: "not_permitted" }));
+      return () => undefined;
+    }
+    const watch = port.watchMiniAppAgentTurn;
+    if (!watch) {
+      onFailure(Object.assign(new Error("runtime_unavailable"), { code: "runtime_unavailable" }));
+      return () => undefined;
+    }
+    return watch(request, onFrame, onFailure);
+  };
+
+  const agentCall: WebuiMiniAppWorkflows["agentCall"] = async (request) => {
+    // No host session means no chat is showing this page, and the runtime refuses
+    // such a caller anyway. Answering here keeps the page from waiting on a reply
+    // the service would never send.
+    if (!request.hostSessionId) return { ok: false, code: "not_permitted" };
+    const call = port.miniAppAgentCall;
+    if (!call) return { ok: false, code: "runtime_unavailable" };
+    return call(request);
+  };
+
+  /** Stops counting one shown session as answerable, and says so. */
+  const closeShown = async (shown: NonNullable<WebuiMiniAppWorkflowsState["agentShown"]>): Promise<void> => {
+    set((current) => (current.agentShown === shown ? { ...current, agentShown: undefined } : current));
+    await agentCall({
+      pluginId: shown.pluginId,
+      hostSessionId: shown.hostSessionId,
+      connection: shown.connection,
+      requestId: `panel-closed-${shown.sessionId}`,
+      method: "panelClosed",
+      targetSessionId: shown.sessionId,
+    }).catch(() => undefined);
+  };
+
+  const reportShown: WebuiMiniAppWorkflows["reportShown"] = async (input) => {
+    const response = await agentCall({
+      pluginId: input.pluginId,
+      hostSessionId: input.hostSessionId,
+      connection: input.connection,
+      requestId: `panel-shown-${input.sessionId}`,
+      method: "panelOpened",
+      targetSessionId: input.sessionId,
+    });
+    // Only a session the runtime accepted is recorded: recording it on a refused
+    // report would make the close report name a panel the runtime never knew about.
+    if (!response.ok) return;
+    set((current) => ({ ...current, agentShown: input }));
+  };
+
+  const noteSelectedSession: WebuiMiniAppWorkflows["noteSelectedSession"] = (sessionId) => {
+    const shown = state.agentShown;
+    if (!shown) return;
+    if (shown.sessionId === sessionId) return;
+    void closeShown(shown);
+  };
+
+  const releaseShown: WebuiMiniAppWorkflows["releaseShown"] = (pluginId) => {
+    const shown = state.agentShown;
+    if (!shown || shown.pluginId !== pluginId) return;
+    void closeShown(shown);
+  };
+
   const mutatePlugin = async (
     action: "enablePlugin" | "disablePlugin" | "uninstallPlugin",
     pluginId: string,
@@ -485,6 +634,11 @@ export function createWebuiMiniAppWorkflows(deps: {
     presentInline,
     standaloneUrl,
     claimStandalone,
+    watchAgentTurn,
+    agentCall,
+    reportShown,
+    noteSelectedSession,
+    releaseShown,
     setPluginEnabled: (pluginId, enabled) =>
       mutatePlugin(enabled ? "enablePlugin" : "disablePlugin", pluginId),
     uninstall: (pluginId) => mutatePlugin("uninstallPlugin", pluginId),

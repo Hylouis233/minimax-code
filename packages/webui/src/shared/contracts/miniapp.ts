@@ -123,6 +123,20 @@ export interface WebuiMiniAppPresentationState {
 export interface WebuiMiniAppView {
   readonly pluginId: string;
   readonly viewUrl: string;
+  /**
+   * The presentation-and-connection generation this service issued for this start.
+   *
+   * The client echoes it on every page-bridge call so a request, a response, an
+   * event or a cancellation produced for a replaced frame cannot land in the
+   * replacement. It is this service's counter, not the runtime's: the runtime's
+   * process generation stays server-side with the rest of the launch coordinates.
+   *
+   * Absent means the host issues no generation, and the bridge then treats the
+   * view as unaddressable — no page call may act as a presentation the service
+   * cannot name. That is why the field is optional and why the client defaults it
+   * to `0`, the value no registered generation ever has.
+   */
+  readonly connection?: number;
 }
 
 // ---------------------------------------------------------------------------

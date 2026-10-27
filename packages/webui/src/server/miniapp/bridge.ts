@@ -24,6 +24,11 @@ import {
   WEBUI_MINIAPP_BRIDGE_PATH,
   WEBUI_MINIAPP_COMPOSER_MAX_TEXT_LENGTH,
 } from "../../shared/contracts/miniapp.js";
+import {
+  WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
+  WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
+  WEBUI_MINIAPP_BRIDGE_AGENT_RESULT,
+} from "../../shared/contracts/miniapp-agent.js";
 import type { MiniAppPageBridge } from "./proxy.js";
 
 /**
@@ -77,6 +82,128 @@ const SCRIPT = `(function () {
   mcode.miniapp = mcode.miniapp || {};
   mcode.miniapp.message = mcode.miniapp.message || {};
   mcode.miniapp.message.append = append;
+  // ---------------------------------------------------------------------
+  // The agent block: window.mcode.miniapp.agent.
+  //
+  // Same namespace as the shipped preload, so a page written against the
+  // desktop client finds every method here. What changes is the transport: a
+  // browser page cannot call a preload, so each call is one postMessage and the
+  // client that framed the page answers it. Identity never travels from here —
+  // the page names content and a correlation id, nothing else.
+  //
+  // cancel names a live request instead of dropping a promise: an abort signal
+  // cannot cross postMessage, so the page asks the host to stop that request and
+  // the answer is the request's own settlement.
+  // ---------------------------------------------------------------------
+  var AGENT_REQUEST = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST)};
+  var AGENT_RESULT = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_RESULT)};
+  var AGENT_EVENT = ${JSON.stringify(WEBUI_MINIAPP_BRIDGE_AGENT_EVENT)};
+  var agentPrefix = Math.random().toString(36).slice(2, 10);
+  var agentSequence = 0;
+  var agentPending = new Map();
+  function agentSettle(requestId, result) {
+    var entry = agentPending.get(requestId);
+    if (!entry) return;
+    agentPending.delete(requestId);
+    if (result && result.ok === true) {
+      entry.resolve(result.value);
+      return;
+    }
+    var code = result && typeof result.code === "string" ? result.code : "result_unknown";
+    var error = new Error(code);
+    if (result && typeof result.reason === "string") error.reason = result.reason;
+    entry.reject(error);
+  }
+  window.addEventListener("message", function (event) {
+    if (event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || typeof data !== "object") return;
+    if (data.type === AGENT_RESULT) {
+      if (typeof data.requestId === "string") agentSettle(data.requestId, data.result);
+      return;
+    }
+    if (data.type === AGENT_EVENT) {
+      if (typeof data.requestId !== "string") return;
+      var entry = agentPending.get(data.requestId);
+      if (!entry || typeof entry.onEvent !== "function") return;
+      try {
+        entry.onEvent(data.event);
+      } catch (ignored) {
+        // A page callback that throws must not end the turn or the stream.
+      }
+    }
+  });
+  function agentRequest(method, payload, options) {
+    return new Promise(function (resolve, reject) {
+      var onEvent = options && typeof options.onEvent === "function" ? options.onEvent : undefined;
+      var requestId =
+        payload && typeof payload.requestId === "string" && payload.requestId
+          ? payload.requestId
+          : agentPrefix + "-" + (++agentSequence);
+      if (agentPending.has(requestId)) {
+        reject(new Error("busy"));
+        return;
+      }
+      agentPending.set(requestId, { resolve: resolve, reject: reject, onEvent: onEvent });
+      // Every field travels: a reply's own requestId is the permission ask it
+      // answers, and stripping it would leave the host with nothing to decide.
+      var body = {};
+      if (payload && typeof payload === "object") {
+        for (var key in payload) {
+          if (Object.prototype.hasOwnProperty.call(payload, key)) body[key] = payload[key];
+        }
+      }
+      try {
+        window.parent.postMessage(
+          {
+            type: AGENT_REQUEST,
+            requestId: requestId,
+            method: method,
+            payload: body,
+            observe: onEvent !== undefined
+          },
+          "*"
+        );
+      } catch (error) {
+        agentPending.delete(requestId);
+        reject(new Error("result_unknown"));
+      }
+    });
+  }
+  mcode.miniapp.agent = {
+    run: function (input, options) {
+      return agentRequest("run", input, options);
+    },
+    answer: function (input, options) {
+      return agentRequest("answer", input, options);
+    },
+    reply: function (input) {
+      return agentRequest("reply", input);
+    },
+    open: function (sessionId) {
+      return agentRequest("open", { sessionId: sessionId });
+    },
+    models: function () {
+      return agentRequest("models", {});
+    },
+    agents: function () {
+      return agentRequest("agents", {});
+    },
+    create: function (input) {
+      return agentRequest("create", input);
+    },
+    cancel: function (requestId) {
+      if (typeof requestId !== "string" || !agentPending.has(requestId)) return;
+      try {
+        window.parent.postMessage(
+          { type: AGENT_REQUEST, requestId: requestId, method: "cancel", payload: {}, observe: false },
+          "*"
+        );
+      } catch (ignored) {
+        // The document is going away; there is nothing left to cancel.
+      }
+    }
+  };
 })();
 `;
 

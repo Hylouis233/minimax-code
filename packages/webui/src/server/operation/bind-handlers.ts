@@ -765,6 +765,8 @@ export const DEDICATED_OPERATION_NAMES = [
   "listMiniApps",
   "openMiniApp",
   "stopMiniApp",
+  "watchMiniAppAgentTurn",
+  "miniAppAgentCall",
 ] as const;
 
 type AnyBinding = WebuiOperationBinding<

@@ -49,6 +49,12 @@ import {
   webuiMiniAppBridgeRequest,
   webuiMiniAppBridgeSenderAllowed,
 } from "../application/miniapp-bridge.js";
+import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-bridge.js";
+import {
+  readSessionIdFromHash,
+  subscribeToSessionHash,
+} from "../../../bindings/navigation.js";
+import { sessionHash } from "../../../projection/common/router.js";
 import {
   webuiMiniAppRefusalText,
   webuiMiniAppWindowName,
@@ -227,6 +233,80 @@ export function MiniAppView({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [answer, composer, detached, name, presentation, sessionId]);
+
+  /**
+   * The page's agent bridge.
+   *
+   * One host per framed document, created with the generation the service issued
+   * for this start. A replacement frame gets a new host, and the old one's teardown
+   * ends the turns it had open — that is the client's half of generation fencing,
+   * while the service refuses any call whose generation it never issued.
+   *
+   * Selection runs through the `#session=` hash, the same anchor a rail link uses,
+   * because ADR 0020 maps a page's `open` onto the rail rather than onto a second
+   * conversation surface. Reporting it shown waits until the rail has actually
+   * selected it: the runtime treats a shown session as answerable, so claiming it
+   * early would make its permission asks wait on a panel that is not on screen.
+   */
+  useEffect(() => {
+    if (!workflows || presentation?.kind !== "open" || detached) return;
+    const viewUrl = presentation.viewUrl;
+    const connection = presentation.connection;
+    const hostSessionId = sessionId ?? "";
+    const agentHost = createWebuiMiniAppAgentBridge({
+      pluginId,
+      hostSessionId,
+      connection,
+      viewUrl,
+      post: (message) => {
+        const target = frameRef.current?.contentWindow;
+        if (!target) return;
+        try {
+          target.postMessage(message, new URL(viewUrl).origin);
+        } catch {
+          // The frame this answer belonged to is gone; nothing is delivered into a
+          // replacement document.
+        }
+      },
+      commands: {
+        call: async (request) => {
+          const response = await workflows.agentCall(request);
+          if (response.ok && response.method === "open") {
+            if (typeof window !== "undefined") {
+              window.location.hash = sessionHash(response.sessionId);
+            }
+            await workflows.reportShown({
+              pluginId,
+              sessionId: response.sessionId,
+              hostSessionId,
+              connection,
+            });
+          }
+          return response;
+        },
+        watchTurn: (request, onFrame, onFailure) =>
+          workflows.watchAgentTurn(request, onFrame, onFailure),
+      },
+    });
+    const onMessage = (event: MessageEvent): void => {
+      agentHost.handleMessage(
+        { data: event.data, origin: event.origin, source: event.source },
+        frameRef.current?.contentWindow ?? null,
+      );
+    };
+    window.addEventListener("message", onMessage);
+    const unsubscribe = subscribeToSessionHash((id) => workflows.noteSelectedSession(id));
+    // The selection at mount is the baseline: a shown session from a previous
+    // document must not be re-reported, and one already switched away is closed.
+    workflows.noteSelectedSession(readSessionIdFromHash(window.location.hash));
+    return () => {
+      window.removeEventListener("message", onMessage);
+      unsubscribe();
+      agentHost.close();
+      // Nothing shows it any more, so the runtime stops counting it as answerable.
+      workflows.releaseShown(pluginId);
+    };
+  }, [detached, pluginId, presentation, sessionId, workflows]);
 
   /**
    * Whether this view can offer the move at all.

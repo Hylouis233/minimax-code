@@ -22,6 +22,12 @@ import type {
   WebuiMiniAppPresentationState,
   WebuiMiniAppView,
 } from "../../../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentCallRequest,
+  WebuiMiniAppAgentCallResponse,
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "../../../../shared/contracts/miniapp-agent.js";
 
 export interface MiniAppPort {
   /**
@@ -68,6 +74,28 @@ export interface MiniAppPort {
      */
     onFailure?: (error: Error) => void,
   ) => () => void;
+  /**
+   * One followed turn: the page's `run` / `answer`.
+   *
+   * The body carries `observe`, because whether the page is listening decides
+   * whether the runtime may wait on it for a permission or questionnaire answer —
+   * and a stream existing is not the same fact. The detach ends this turn's socket
+   * and nothing else.
+   */
+  readonly watchMiniAppAgentTurn?: (
+    request: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
+  /**
+   * One short Mini App agent call, its refusal included in the body.
+   *
+   * A refusal is a body rather than a thrown error because the page has to receive
+   * its documented code; only a transport failure throws here.
+   */
+  readonly miniAppAgentCall?: (
+    request: WebuiMiniAppAgentCallRequest,
+  ) => Promise<WebuiMiniAppAgentCallResponse>;
   /** The standalone page's URL, token included. Built by the wire, not the UI. */
   readonly miniappStandaloneUrl?: (request: {
     readonly pluginId: string;

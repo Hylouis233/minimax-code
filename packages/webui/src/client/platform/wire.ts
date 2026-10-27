@@ -16,6 +16,10 @@
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
 import type { WebuiMiniAppPresentationState } from "../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppAgentTurnFrame,
+  WebuiMiniAppAgentTurnRequest,
+} from "../../shared/contracts/miniapp-agent.js";
 import type { WebuiTerminalFrame } from "../../shared/contracts/terminal.js";
 import type {
   WebuiBrowserImageFrame,
@@ -175,6 +179,19 @@ export interface WebuiWire {
     operation: string,
     requestBody: { readonly pluginId: string; readonly sessionId: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  /**
+   * One followed Mini App turn, as a stream.
+   *
+   * The settlement arrives as the stream's last frame rather than as the socket's
+   * closing: `settled` carries the turn's result and `failure` its code, so a page
+   * always learns how the call ended instead of inferring it from a drop.
+   */
+  watchMiniAppAgentTurn(
+    operation: string,
+    requestBody: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
     onFailure?: (error: Error) => void,
   ): () => void;
   /** The one HTTP route, built from the same base and token as the socket. */
@@ -585,6 +602,43 @@ export function createWebuiWire({
     };
   }
 
+  function watchMiniAppAgentTurn(
+    operation: string,
+    requestBody: WebuiMiniAppAgentTurnRequest,
+    onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    const session = openWireSession(operation, requestBody, {
+      frame: (session, frame) => {
+        if (stopped) return;
+        if (frame.kind === "error") {
+          // The service refused the turn before running it, or the stream broke.
+          // Either way this turn is over: the caller decides what the code means.
+          stopped = true;
+          session.close();
+          onFailure?.(
+            new WebuiWireError(
+              frame.code,
+              frame.message ?? `${operation} refused`,
+              frame.requestId,
+            ),
+          );
+          return;
+        }
+        if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        const decoded = frame.body as WebuiMiniAppAgentTurnFrame;
+        // The settlement is the last frame; nothing after it belongs to this turn.
+        if (decoded.kind === "settled" || decoded.kind === "failure") stopped = true;
+        onFrame(decoded);
+      },
+    });
+    return () => {
+      stopped = true;
+      session.close();
+    };
+  }
+
   function miniappStandaloneUrl({
     pluginId,
     sessionId,
@@ -622,6 +676,7 @@ export function createWebuiWire({
     watchBrowserFrames,
     watchBrowserWebTabs,
     watchMiniAppPresentation,
+    watchMiniAppAgentTurn,
     workspaceFileUrl,
     miniappStandaloneUrl,
     watchEvents: createWebuiEventChannel({ websocketUrl, webSocket }),
