@@ -119,8 +119,9 @@ owns rather than a thing the Agent drives.
   surface could not be a tab's content; a launcher can. The `browser` kind is not one of the four:
   it is deleted, and the tab it used to be is replaced by the web tabs.
 - **The URL box belongs to the new tab page.** There is no persistent address bar. A web tab carries
-  a toolbar instead: back, forward, reload, and the URL shown read-only. A person who wants another
-  URL opens a new tab and types it there.
+  a toolbar instead: back, forward, reload, home to return to the new tab page in the same tab, and
+  the URL shown read-only. Back and forward are disabled when the page has no entry in that
+  direction. A person who wants another URL opens a new tab and types it there.
 - **Every web tab goes through the same switch.** The person's launcher path reads the same surface
   switch as the Agent's path, and a tab on a surface whose switch is off does not open.
 - **A web tab is titled by the page and glyphed by default.** The title is the one the provider

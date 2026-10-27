@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type AnimationEvent as ReactAnimationEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { Terminal } from "@xterm/xterm";
 import { IconEdit } from "@tabler/icons-react";
 import { FitAddon } from "@xterm/addon-fit";
@@ -29,7 +29,7 @@ import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // is the part that crosses into the browser business through its published
 // port. The strip subscribes to `watchBrowserWebTabs` and, for the active
 // web tab, this file mounts `BrowserPanelHost` with the tab's target.
-import { BrowserPanelHost } from "../../browser/ui/BrowserPanelHost.public.js";
+import { BrowserPanelHost, WebuiBrowserToolbar } from "../../browser/ui/BrowserPanelHost.public.js";
 import { MiniAppView } from "../../miniapp/ui/MiniAppView.public.js";
 import type {
   WebuiWorkspaceFile,
@@ -72,8 +72,9 @@ import {
   useWebuiWorkspaceQueries,
   useWebuiWorkspaceQueriesState,
 } from "../../../bindings/use-query-state.js";
+import { useWebuiPortSlice } from "../../../bindings/port-slices-context.js";
 import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
-import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip } from "./WebuiWorkspaceTabStrip.public.js";
+import { WebuiWorkspaceLauncher, WebuiWorkspaceTabStrip, webuiWorkspaceLauncherOpenPage, webuiWorkspaceLauncherUrl } from "./WebuiWorkspaceTabStrip.public.js";
 import { webuiFileLanguage, projectWebuiUnifiedDiffLines, isWorkspaceArchivePath, isWorkspaceHtmlPath } from "../projection/panel-projection.js";
 import {
   projectWebuiDiffFile,
@@ -123,24 +124,27 @@ function highlightFileLine(line: string, language: string | undefined): string |
   }
 }
 
-export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void }): ReactElement {
+export function WebuiDiffFileSection({ file, selected, loading = false, error, onSelect, defaultOpen = true }: { readonly file: WebuiDiffFileEntry; readonly selected: boolean; readonly loading?: boolean; readonly error?: string; readonly onSelect?: () => void; readonly defaultOpen?: boolean }): ReactElement {
+  const [expanded, setExpanded] = useState(defaultOpen);
   const diff = file.withinWorkspace && typeof file.diff === "string" ? file.diff : "";
   const lines = projectWebuiUnifiedDiffLines(diff);
   const language = webuiFileLanguage(file.file);
-  return <details className="webui-turn-review-file" open data-testid="turn-review-diff-file">
-    <summary className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} onClick={onSelect}>
+  return <section className="webui-turn-review-file" data-expanded={expanded} data-testid="turn-review-diff-file">
+    <button type="button" className="webui-turn-review-file-heading" aria-current={selected ? "true" : undefined} aria-expanded={expanded} onClick={() => { onSelect?.(); setExpanded((value) => !value); }}>
       <WebuiIconChevronRight className="webui-turn-review-chevron" />
       <span className="webui-diff-file-icon"><WebuiIconDiffFile fileName={file.file} /></span>
-      <span className="webui-turn-review-file-path" title={file.file}>{file.file}</span>
+      <span className="webui-turn-review-file-path">{file.file}</span>
       <span className="webui-diff-add">+{file.additions}</span>
       {file.deletions > 0 ? <span className="webui-diff-del">-{file.deletions}</span> : null}
-    </summary>
-    {!file.withinWorkspace
-      /* The file is outside the workspace, so its content is not shown. The
-       * entry stays in the list: the file name and the counts are the part a
-       * person can still act on. */
-      ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
-      : loading ? <p className="webui-turn-review-unavailable" role="status">正在加载差异…</p> : error ? <p className="webui-turn-review-unavailable" role="alert">{error}</p> : lines.length ? <pre className="webui-file-code webui-turn-review-code"><code className={language ? `hljs language-${language}` : ""}>{lines.map((line, index) => {
+    </button>
+    <div className={`webui-expandable-motion${expanded ? " is-open" : ""}`} aria-hidden={!expanded}>
+      <div>
+        {!file.withinWorkspace
+          /* The file is outside the workspace, so its content is not shown. The
+           * entry stays in the list: the file name and the counts are the part a
+           * person can still act on. */
+          ? <p className="webui-turn-review-unavailable" data-testid="turn-review-outside-workspace">{WEBUI_DIFF_OUTSIDE_WORKSPACE_NOTICE}</p>
+          : loading ? <p className="webui-turn-review-unavailable" role="status">正在加载差异…</p> : error ? <p className="webui-turn-review-unavailable" role="alert">{error}</p> : lines.length ? <pre className="webui-file-code webui-turn-review-code"><code className={language ? `hljs language-${language}` : ""}>{lines.map((line, index) => {
       const highlighted = line.kind === "hunk" || line.kind === "noNewline" ? undefined : highlightFileLine(line.content, language);
       return <span className={`webui-turn-review-line webui-turn-review-line--${line.kind}`} key={`${index}-${line.kind}`}>
         {line.kind === "hunk" ? <span className="webui-turn-review-hunk">{line.content}</span> : line.kind === "noNewline" ? line.content : <>
@@ -149,9 +153,11 @@ export function WebuiDiffFileSection({ file, selected, loading = false, error, o
           <span className="webui-turn-review-marker">{line.kind === "addition" ? "+" : line.kind === "deletion" ? "−" : " "}</span>
           <span className="webui-turn-review-source">{highlighted === undefined ? line.content : <span dangerouslySetInnerHTML={{ __html: highlighted }} />}</span>
         </>}
-      </span>;
-    })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
-  </details>;
+        </span>;
+      })}</code></pre> : <p className="webui-turn-review-unavailable">当前运行时没有提供该文件的文本 patch。</p>}
+      </div>
+    </div>
+  </section>;
 }
 
 export function WebuiFilePreview({ tabId, content, result, codeMode, workspaceFileUrl, }: {
@@ -204,6 +210,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   readonly terminal?: WebuiTerminalOwner;
   readonly onClose?: () => void;
 }): ReactElement {
+  const browserPort = useWebuiPortSlice("browser");
   const [panelWidth, setPanelWidth] = useState<number>();
   const [panelCovering, setPanelCovering] = useState(false);
   const [panelClosing, setPanelClosing] = useState(false);
@@ -225,6 +232,24 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const reviewDiffs = queryState.reviewDiffs;
   const reviewSearch = queryState.reviewSearch;
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+  const activeWebTab = activeTab && activeTab.content.kind === "web"
+    ? { id: activeTab.id, content: activeTab.content }
+    : undefined;
+  // Keep the most recently viewed browser tab mounted while another workspace
+  // tab is selected. BrowserPanelHost owns the live frame subscription and its
+  // image element; unmounting it here forces a new subscription and leaves a
+  // visible blank interval on every return to a web tab.
+  const retainedWebTabId = useRef<string | undefined>(
+    activeWebTab?.id ?? state.tabs.find((candidate) => candidate.content.kind === "web")?.id,
+  );
+  useLayoutEffect(() => {
+    if (activeWebTab) retainedWebTabId.current = activeWebTab.id;
+  }, [activeWebTab?.id]);
+  const retainedWebTab = state.tabs.find(
+    (candidate): candidate is WorkspacePanelTab & { readonly content: Extract<WorkspacePanelTab["content"], { readonly kind: "web" }> } =>
+      candidate.id === retainedWebTabId.current && candidate.content.kind === "web",
+  );
+  const browserTab = activeWebTab ?? retainedWebTab;
   const tab = activeTab?.content.kind ?? "files";
   const fileTreeScrollRef = useRef<HTMLDivElement>(null);
   const autoNavigationRequests = useRef(new Set<string>());
@@ -233,6 +258,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set());
   const [fileCodeMode, setFileCodeMode] = useState(false);
   const [reviewSearchQuery, setReviewSearchQuery] = useState("");
+  const [reviewSearchAppliedQuery, setReviewSearchAppliedQuery] = useState("");
   const [terminals, setTerminalsState] = useState<readonly Record<string, unknown>[]>([]);
   /**
    * A terminal list answer is rendered directly (`terminals.find`, `terminals.map`),
@@ -343,6 +369,16 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const workspaceReviewSelectedPath = activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.selectedPath : undefined;
   const workspaceReviewWorkspaceDir = activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.workspaceDir : undefined;
   const workspaceReviewFiles = reviewSummary !== undefined && reviewSummary.tabId === activeTab?.id ? reviewSummary.summary?.files ?? [] : [];
+  const currentWorkspaceReviewSearch = activeTab?.content.kind === "review" && activeTab.content.source === "workspace"
+    && reviewSearch?.tabId === activeTab.id && reviewSearch.snapshotId === activeTab.content.reviewSnapshotId
+    ? reviewSearch
+    : undefined;
+  const matchedWorkspaceReviewFiles = reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.result
+    ? currentWorkspaceReviewSearch.result.matchedFiles
+      .map((match) => workspaceReviewFiles.find((file) => file.fileId === match.fileId))
+      .filter((file): file is NonNullable<typeof file> => file !== undefined)
+    : workspaceReviewFiles;
+  const showingWorkspaceReviewSearchResults = Boolean(reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.result && !currentWorkspaceReviewSearch.loading && !currentWorkspaceReviewSearch.error);
   // The turn's files are projected through the workspace boundary before they
   // are rendered: a file outside the workspace keeps its name and its counts,
   // and loses the body that would have shown its content.
@@ -364,7 +400,10 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   }, [activeTab?.id, activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.reviewSnapshotId : undefined, activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? activeTab.content.workspaceDir : undefined, reviewSummary?.summary?.reviewSnapshotId, queries]);
   const runReviewSearch = () => {
     if (activeTab?.content.kind !== "review" || activeTab.content.source !== "workspace" || !activeTab.content.reviewSnapshotId || !queries) return;
-    void queries.searchReviewDiffs({ tabId: activeTab.id, workspaceDir: activeTab.content.workspaceDir, snapshotId: activeTab.content.reviewSnapshotId, query: reviewSearchQuery });
+    const query = reviewSearchQuery.trim();
+    setReviewSearchAppliedQuery(query);
+    if (!query) return;
+    void queries.searchReviewDiffs({ tabId: activeTab.id, workspaceDir: activeTab.content.workspaceDir, snapshotId: activeTab.content.reviewSnapshotId, query });
   };
   const toggleWorkspaceDirectory = (directory: WebuiWorkspaceFile) => {
     const path = directory.path;
@@ -487,7 +526,12 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     terminal.open(host);
     let disposed = false;
     let initialFitFrame: number | undefined;
-    void document.fonts.ready.then(() => {
+    // The grid is measured once the fonts have landed: a measurement taken
+    // against fallback glyphs is a measurement of the wrong grid. The wait
+    // comes from the browser platform, because a panel that reached for
+    // `document` itself would be a panel that could only be placed against a
+    // browser.
+    void dom.whenFontsReady().then(() => {
       if (disposed) return;
       initialFitFrame = requestAnimationFrame(() => {
         if (disposed) return;
@@ -532,7 +576,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     const input = terminal.onData((data) => { if (terminalOwner?.canWrite) void terminalOwner.write(terminalId, data); });
     let disposed = false;
     let initialFitFrame: number | undefined;
-    void document.fonts.ready.then(() => {
+    void dom.whenFontsReady().then(() => {
       if (disposed) return;
       initialFitFrame = requestAnimationFrame(() => {
         if (disposed) return;
@@ -632,7 +676,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
         <button type="button" aria-pressed={!fileCodeMode} onClick={() => setFileCodeMode(false)}>预览</button>
         <button type="button" aria-pressed={fileCodeMode} onClick={() => setFileCodeMode(true)}>代码</button>
       </div> : null}
-      {activeTab?.content.kind === "file-preview" ? <button type="button" className="webui-workspace-edit-action" aria-label="编辑文件（暂未支持）" title="编辑文件（暂未支持）" disabled><IconEdit aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} /></button> : null}
+      {activeTab?.content.kind === "file-preview" ? <button type="button" className="webui-workspace-edit-action" aria-label="编辑文件（暂未支持）" disabled><IconEdit aria-hidden="true" className="size-[18px]" size={18} stroke={1.7} /></button> : null}
       <button type="button" className="webui-workspace-tree-toggle" aria-label={fileTreeOpen ? "隐藏文件树" : "显示文件树"} aria-pressed={fileTreeOpen} onClick={() => setFileTreeOpen((open) => !open)}><WebuiIconSidebarToggle className="size-5" /></button>
     </div> : null}
     <div className="webui-workspace-panel-body">
@@ -642,16 +686,17 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     {tab === "review" && activeTab?.content.kind === "review" && activeTab.content.source === "workspace" ? <div className="webui-turn-review" data-testid="workspace-review">
       {reviewSummary?.tabId !== activeTab.id || reviewSummary.loading && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="status">正在收集变更…</p> : reviewSummary.error && !reviewSummary.summary ? <p className="webui-turn-review-empty" role="alert">{reviewSummary.error}</p> : reviewSummary.summary ? <>
         <div className="webui-turn-review-summary"><span>{reviewSummary.summary.totals.files} 个文件</span><span className="webui-diff-header-stats"><span className="webui-diff-add">+{reviewSummary.summary.totals.additions}</span>{reviewSummary.summary.totals.deletions ? <span className="webui-diff-del">-{reviewSummary.summary.totals.deletions}</span> : null}</span></div>
-        {reviewSummary.stale || reviewSummary.error ? <p className="webui-workspace-review-status" role="status">变更列表可能已过期{reviewSummary.error ? `：${reviewSummary.error}` : "，正在刷新…"}</p> : null}
         {reviewSummary.summary.files.length ? <>
           <form className="webui-workspace-review-search" onSubmit={(event) => { event.preventDefault(); runReviewSearch(); }}><input aria-label="搜索变更" value={reviewSearchQuery} onChange={(event) => setReviewSearchQuery(event.currentTarget.value)} placeholder="搜索变更" /><button type="submit" disabled={!queries?.canSearchReviewDiffs || reviewSearch?.loading}>搜索</button></form>
-          {reviewSearch?.tabId === activeTab.id && reviewSearch.snapshotId === activeReview?.reviewSnapshotId ? reviewSearch.loading ? <p className="webui-workspace-review-status" role="status">正在搜索变更…</p> : reviewSearch.error ? <p className="webui-workspace-review-status" role="alert">{reviewSearch.error}</p> : reviewSearch.result ? <ul className="webui-workspace-review-search-results" data-testid="workspace-review-search-results">{reviewSearch.result.matchedFiles.map((match) => <li key={match.fileId}><button type="button" onClick={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: match.path })}>{match.path} <small>{match.matchCount}</small></button></li>)}</ul> : null : null}
+          {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.loading ? <p className="webui-workspace-review-status" role="status">正在搜索变更…</p> : null}
+          {reviewSearchAppliedQuery && currentWorkspaceReviewSearch?.error ? <p className="webui-workspace-review-status" role="alert">{currentWorkspaceReviewSearch.error}</p> : null}
           {reviewDiffs?.error && reviewDiffs.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? <p className="webui-workspace-review-status" role="alert">{reviewDiffs.error}</p> : null}
-          <div className="webui-turn-review-files">{reviewSummary.summary.files.map((file) => {
+          {showingWorkspaceReviewSearchResults && matchedWorkspaceReviewFiles.length === 0 ? <p className="webui-turn-review-empty" role="status">没有匹配的变更文件。</p> : null}
+          {!reviewSearchAppliedQuery || !currentWorkspaceReviewSearch?.loading && !currentWorkspaceReviewSearch?.error && matchedWorkspaceReviewFiles.length > 0 ? <div className="webui-turn-review-files" data-testid={showingWorkspaceReviewSearchResults ? "workspace-review-search-results" : undefined}>{matchedWorkspaceReviewFiles.map((file) => {
             const result = reviewDiffs?.tabId === activeTab.id && reviewDiffs.snapshotId === activeReview?.reviewSnapshotId ? reviewDiffs.diffs[file.fileId] : undefined;
             const loading = !result && (reviewDiffs?.tabId !== activeTab.id || reviewDiffs.snapshotId !== activeReview?.reviewSnapshotId || reviewDiffs.loading);
-            return <WebuiDiffFileSection key={file.fileId} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} onSelect={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: file.path })} />;
-          })}</div>
+            return <WebuiDiffFileSection key={`${file.fileId}:${showingWorkspaceReviewSearchResults ? "search" : "list"}`} file={projectWebuiDiffFile({ file: file.path, additions: file.additions, deletions: file.deletions, status: file.status, ...(result?.diff !== undefined ? { diff: result.diff } : {}) }, workspaceReviewWorkspaceDir)} selected={selectedReviewPath === file.path} loading={loading} error={result?.binary ? "二进制文件无法显示文本差异。" : result?.error} defaultOpen={!showingWorkspaceReviewSearchResults} onSelect={() => dispatch({ type: "select-review-file", tabId: activeTab.id, path: file.path })} />;
+          })}</div> : null}
         </> : <p className="webui-turn-review-empty">当前没有变更。</p>}
       </> : null}
     </div> : null}
@@ -660,10 +705,38 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       {turnReviewFiles.length ? <div className="webui-turn-review-files">{turnReviewFiles.map((file) => <WebuiDiffFileSection key={file.file} file={file} selected={selectedReviewPath === file.file} />)}</div> : <p className="webui-turn-review-empty">本轮没有可审查的文件差异。</p>}
     </div> : null}
     {tab === "canvas" ? <WorkspaceCanvas sessionId={activeSessionId} /> : null}
-    {tab === "web" && activeTab?.content.kind === "web" ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={activeTab.id}>
-      <BrowserPanelHost target={activeTab.content.target} url={activeTab.content.url} />
+    {browserTab ? <div className="webui-workspace-web-tab" data-testid="workspace-web-tab" data-tab-id={browserTab.id} data-inactive={!activeWebTab ? "true" : undefined} aria-hidden={!activeWebTab}>
+      <BrowserPanelHost
+        target={browserTab.content.target}
+        url={browserTab.content.url}
+        canGoBack={browserTab.content.canGoBack}
+        canGoForward={browserTab.content.canGoForward}
+        onReturnToNewTab={async () => {
+          const { target } = browserTab.content;
+          const tabId = browserTab.id;
+          await browserPort?.closeBrowserWebTab?.({ target });
+          dispatch({ type: "return-web-tab-to-launcher", tabId });
+        }}
+      />
     </div> : null}
-    {tab === "launcher" && activeTab?.content.kind === "launcher" ? <WebuiWorkspaceLauncher tab={activeTab} dispatch={panelDispatch} sessionId={sessionId} workspaceDir={workspaceDir} /> : null}
+    {tab === "launcher" && activeTab?.content.kind === "launcher" ? <div className="webui-workspace-web-tab" data-testid="workspace-launcher-tab">
+      <WebuiBrowserToolbar
+        navigationDisabled
+        onNavigate={(input) => {
+          const url = webuiWorkspaceLauncherUrl(input);
+          const open = browserPort?.openBrowserWebTab;
+          if (!url || !open) return;
+          void webuiWorkspaceLauncherOpenPage({
+            tabId: activeTab.id,
+            url,
+            dispatch,
+            open,
+            ...(sessionId ? { runId: sessionId } : {}),
+          });
+        }}
+      />
+      <WebuiWorkspaceLauncher tab={activeTab} dispatch={panelDispatch} sessionId={sessionId} workspaceDir={workspaceDir} />
+    </div> : null}
     {/* A Mini App's page. The mounted component belongs to the Mini App
         business, which owns the view URL, the runtime state and the page
         bridge; this panel decides only that the tab is where it goes. */}

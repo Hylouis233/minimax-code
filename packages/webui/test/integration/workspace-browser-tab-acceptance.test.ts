@@ -530,7 +530,10 @@ describe.skipIf(!available)("the acceptance of the workspace browser tab model",
         const state = reduceWorkspacePanelState(panel(), { type: "open-new-tab" });
         const tabId = state.activeTabId!;
         const url = webuiWorkspaceLauncherUrl("example.test");
-        expect(url).toBe("https://example.test");
+        // The launcher hands the browser the same canonical address the
+        // address bar uses, so a bare host arrives with the root path the
+        // URL parser gives it.
+        expect(url).toBe("https://example.test/");
 
         const entry = handler("openBrowserWebTab");
         const opened = (await entry.handle(

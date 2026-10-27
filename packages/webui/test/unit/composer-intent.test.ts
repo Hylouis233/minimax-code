@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import {
   deriveRecentWorkspaceDirs,
-  resolveWebuiComposerEnterAction,
+  resolveWebuiComposerShortcutAction,
   resolveWebuiSubmissionIntent,
   type WebuiSubmissionIntent,
 } from "../../src/client/features/composer/projection/composer-state.js";
+import {
+  DEFAULT_SHORTCUT_BINDINGS,
+  type ShortcutBindings,
+  type ShortcutKeyEvent,
+} from "../../src/client/projection/common/shortcuts.js";
 import { isTurnLive } from "../../src/client/features/turn/contracts/stream-state.js";
 import type { SlashCommandEntry } from "../../src/client/features/composer/ui/slash-palette.js";
 import {
@@ -596,94 +601,90 @@ describe("deriveRecentWorkspaceDirs — the 最近 group in the workspace picker
 });
 
 /**
- * Enter-to-send in the composer textarea.
+ * What a key press in the composer does.
  *
- *   resolveWebuiComposerEnterAction(key, gates) → "submit" | "newline"
+ *   resolveWebuiComposerShortcutAction(key, gates, bindings)
+ *     → "submit" | "newline" | "ignore"
  *
- * The taxonomy is two-valued on purpose: `newline` is the absence of an
- * action, and the component reads it as "do not preventDefault", so the
- * textarea keeps its own line break. Everything Enter could otherwise mean —
- * accepting an open mention, accepting an open slash command — is claimed by
- * earlier branches of the component's `onKeyDown`, which return before this
- * resolver is consulted.
+ * The taxonomy is three-valued because the bindings are rebindable: `newline`
+ * is the action the user bound to breaking the line, `ignore` is the absence
+ * of a binding, and the component reads `ignore` as "do not preventDefault", so
+ * the textarea keeps its own behaviour for that key. Everything Enter could
+ * otherwise mean — accepting an open mention, accepting an open slash command
+ * — is claimed by earlier branches of the component's `onKeyDown`, which return
+ * before this resolver is consulted.
  *
- * These tests pin the precedence the resolver documents: any modifier first,
- * then an open IME composition, then the submit gate. The IME case is the one
- * that is easy to regress silently and expensive when it does — a Chinese or
- * Japanese candidate window is confirmed with Enter, and submitting on that
- * keystroke would send a half-typed word.
+ * These tests pin the precedence the resolver documents: the composition
+ * first, then the configured bindings, then the submit gate. The IME case is
+ * the one that is easy to regress silently and expensive when it does — a
+ * Chinese or Japanese candidate window is confirmed with Enter, and
+ * submitting on that keystroke would send a half-typed word.
  */
-describe("resolveWebuiComposerEnterAction", () => {
-  const enter = {
-    shiftKey: false,
-    altKey: false,
+describe("resolveWebuiComposerShortcutAction", () => {
+  const key = (overrides: Partial<ShortcutKeyEvent> = {}): ShortcutKeyEvent => ({
+    key: "Enter",
+    code: "Enter",
     ctrlKey: false,
     metaKey: false,
-    isComposing: false,
-    submitBlocked: false,
-  };
+    altKey: false,
+    shiftKey: false,
+    ...overrides,
+  });
+  const resolve = (
+    event: ShortcutKeyEvent,
+    overrides: { readonly isComposing?: boolean; readonly submitBlocked?: boolean; readonly bindings?: ShortcutBindings } = {},
+  ): string =>
+    resolveWebuiComposerShortcutAction({
+      event,
+      isComposing: overrides.isComposing ?? false,
+      submitBlocked: overrides.submitBlocked ?? false,
+      bindings: overrides.bindings ?? DEFAULT_SHORTCUT_BINDINGS,
+    });
 
   it("submits on a bare Enter when the draft can be sent", () => {
-    expect(resolveWebuiComposerEnterAction(enter)).toBe("submit");
+    expect(resolve(key())).toBe("submit");
+  });
+
+  it("breaks the line on the newline binding", () => {
+    expect(resolve(key({ shiftKey: true }))).toBe("newline");
   });
 
   // Each modifier is checked on its own: a combined assertion would pass even
-  // if the implementation tested only one of them.
-  for (const modifier of ["shiftKey", "altKey", "ctrlKey", "metaKey"] as const) {
-    it(`keeps the newline for ${modifier}`, () => {
-      expect(
-        resolveWebuiComposerEnterAction({ ...enter, [modifier]: true }),
-      ).toBe("newline");
+  // if the implementation tested only one of them. None of them is a binding
+  // under the default configuration, so the textarea keeps its own behaviour.
+  for (const modifier of ["altKey", "ctrlKey", "metaKey"] as const) {
+    it(`leaves ${modifier} + Enter to the browser`, () => {
+      expect(resolve(key({ [modifier]: true }))).toBe("ignore");
     });
   }
 
-  it("keeps the newline while an IME candidate window is open", () => {
+  it("leaves Enter alone while an IME candidate window is open", () => {
     // Submitting here would discard the candidate the user is still choosing.
-    expect(resolveWebuiComposerEnterAction({ ...enter, isComposing: true })).toBe(
-      "newline",
-    );
+    expect(resolve(key(), { isComposing: true })).toBe("ignore");
   });
 
   it("does not submit when the send button is blocked", () => {
     // The component feeds its `submitBlocked` — the button's own `disabled`
     // condition — in, so the keyboard cannot open a path the button refuses.
-    expect(
-      resolveWebuiComposerEnterAction({ ...enter, submitBlocked: true }),
-    ).toBe("newline");
+    expect(resolve(key(), { submitBlocked: true })).toBe("ignore");
   });
 
-  it("prefers composition over the submit gate and vice versa, both losing to modifiers", () => {
-    // Modifier is the outermost guard: Shift+Enter stays a newline even when
-    // a send is perfectly available.
-    expect(
-      resolveWebuiComposerEnterAction({
-        ...enter,
-        shiftKey: true,
-        isComposing: false,
-        submitBlocked: false,
-      }),
-    ).toBe("newline");
+  it("prefers composition over the submit gate and vice versa, both losing to a binding", () => {
+    // A binding is the outermost guard after the composition: the newline
+    // binding stands even when a send is perfectly available.
+    expect(resolve(key({ shiftKey: true }), { submitBlocked: false })).toBe("newline");
     // With no modifier, composing still wins over an otherwise sendable draft.
-    expect(
-      resolveWebuiComposerEnterAction({
-        ...enter,
-        shiftKey: false,
-        isComposing: true,
-        submitBlocked: false,
-      }),
-    ).toBe("newline");
+    expect(resolve(key(), { isComposing: true, submitBlocked: false })).toBe("ignore");
   });
 
-  it("only submits when no modifier is held, nothing is composing, and the gate is open", () => {
-    expect(
-      resolveWebuiComposerEnterAction({
-        shiftKey: false,
-        altKey: false,
-        ctrlKey: false,
-        metaKey: false,
-        isComposing: false,
-        submitBlocked: false,
-      }),
-    ).toBe("submit");
+  it("follows the configured binding instead of the built-in one", () => {
+    const rebound: ShortcutBindings = { ...DEFAULT_SHORTCUT_BINDINGS, "composer.submit": "Control+Enter" };
+    expect(resolve(key(), { bindings: rebound })).toBe("ignore");
+    expect(resolve(key({ ctrlKey: true }), { bindings: rebound })).toBe("submit");
+  });
+
+  it("follows a newline binding the browser does not break the line on", () => {
+    const rebound: ShortcutBindings = { ...DEFAULT_SHORTCUT_BINDINGS, "composer.newline": "Control+J" };
+    expect(resolve(key({ key: "j", code: "KeyJ", ctrlKey: true }), { bindings: rebound })).toBe("newline");
   });
 });

@@ -216,7 +216,7 @@ describe("the Browser panel", () => {
     expect(markup).not.toContain('data-testid="browser-panel-frame"');
   });
 
-  it("announces a target whose generation moved, so stale input is not silently kept", () => {
+  it("does not show a notice when the viewed target generation moves", () => {
     const state = reduceWebuiBrowserPanelState(loadedState(), {
       type: "targets-loaded",
       list: {
@@ -231,8 +231,8 @@ describe("the Browser panel", () => {
     });
     const markup = renderToStaticMarkup(<BrowserPanel port={wiredPort} state={state} />);
 
-    expect(markup).toContain('data-testid="browser-panel-target-changed"');
-    expect(markup).toContain("第 5 代");
+    expect(markup).not.toContain('data-testid="browser-panel-target-changed"');
+    expect(markup).not.toContain("第 5 代");
     // The buffered picture belonged to generation 4, so it is not displayed.
     expect(markup).not.toContain('data-testid="browser-panel-frame"');
   });

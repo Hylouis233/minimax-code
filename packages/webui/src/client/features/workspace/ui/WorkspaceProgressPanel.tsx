@@ -155,12 +155,12 @@ export function WebuiEnvironmentPanel({ workspaceDir, isDefaultWorkspace = false
   return <>
     <WorkspaceProgressSection kind="environment" className={`webui-environment-panel${pending ? " is-loading" : ""}`} title={PROGRESS_COPY.environment} collapsed={collapsed} onToggle={onToggle} busy={pending}>
         {pending ? <div className="webui-environment-loading" role="status" aria-label="正在加载环境信息"><span className="webui-environment-skeleton webui-environment-skeleton--branch" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /><span className="webui-environment-skeleton webui-environment-skeleton--action" /></div> : environmentError ? <div className="webui-environment-loading" role="alert">环境信息加载失败：{environmentError}</div> : environment ? <div className="webui-environment-body">
-          <div className="webui-environment-workspace" title={workspaceDir}>{environment.branch || " "}</div>
+          <div className="webui-environment-workspace">{environment.branch || " "}</div>
           <div className="webui-environment-actions">
-            <button type="button" className="webui-environment-action" onClick={onOpenChanges} disabled={!onOpenChanges} title={environment.changesError ?? undefined}>
+            <button type="button" className="webui-environment-action" onClick={onOpenChanges} disabled={!onOpenChanges}>
               <WebuiIconRunLocation className="size-5" /><span>{PROGRESS_COPY.changes}</span>{hasLineChanges ? <small aria-label={`新增 ${environment.insertions} 行，删除 ${environment.deletions} 行`}><span className="webui-diff-additions">+{environment.insertions}</span><span className="webui-diff-deletions">-{environment.deletions}</span></small> : null}
             </button>
-            <button type="button" className="webui-environment-action" onClick={() => setCommitOpen(true)} disabled={!canMutate} title={!queries?.canMutateGit ? PROGRESS_COPY.unsupported : environment.metadataError ?? environment.changesError}>
+            <button type="button" className="webui-environment-action" onClick={() => setCommitOpen(true)} disabled={!canMutate}>
               <WebuiIconFile className="size-5" /><span>{PROGRESS_COPY.commit}</span>
             </button>
             <button type="button" className="webui-environment-action" onClick={onOpenTerminal} disabled={!onOpenTerminal}>

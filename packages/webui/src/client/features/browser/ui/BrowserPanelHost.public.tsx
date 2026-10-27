@@ -27,9 +27,8 @@
 // the page is this business's: the strip owns the row of tabs and nothing
 // between them, and a workspace component that drew the chrome of a foreign
 // business's page would be the dependency rule inverted. So the toolbar is a
-// view over what the tab holds — its target and the url the runtime published
-// with it — and both are values, not authority: the host drives the port and
-// the strip never does.
+// view over what the tab holds. Its editable address submits navigation bound
+// to that tab's target through this owner; the workspace never drives the port.
 //
 // **Two cells meet here.** The `target` prop is the client's: the tab the person
 // is looking at, which the strip chooses and this host binds every display and
@@ -46,6 +45,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type FormEvent,
   type ReactElement,
 } from "react";
 
@@ -70,6 +70,7 @@ import {
   WebuiIconChevronLeft,
   WebuiIconChevronRight,
   WebuiIconGlobe,
+  WebuiIconHome,
   WebuiIconReload,
 } from "../../../shell/icons.js";
 import type { BrowserPort } from "../contracts/browser-port.js";
@@ -89,16 +90,15 @@ import {
 import { BrowserPanel } from "./BrowserPanel.public.js";
 
 /**
- * The commands a web tab's toolbar can send.
+ * The history buttons a web tab's toolbar can send.
  *
- * Three, and no more. They are the page's own history and its own re-read —
- * what a tab does to the page it holds. Opening a url is not one of them: the
- * address box exists in the new tab page, which is the only place a person
- * types a url.
+ * These are the page's own history and re-read. Address submission is a
+ * separate `navigate` action bound to the current tab's target.
  */
 export const WEBUI_BROWSER_TOOLBAR_COMMANDS = ["back", "forward", "reload"] as const;
 
 export type WebuiBrowserToolbarCommand = (typeof WEBUI_BROWSER_TOOLBAR_COMMANDS)[number];
+export type WebuiBrowserToolbarAction = WebuiBrowserToolbarCommand | "navigate";
 
 const TOOLBAR_COPY = {
   label: "网页工具栏",
@@ -108,6 +108,7 @@ const TOOLBAR_COPY = {
     back: "后退",
     forward: "前进",
     reload: "刷新",
+    home: "回到新建标签页",
   },
 } as const;
 
@@ -138,14 +139,17 @@ export interface BrowserPanelHostProps {
    * than being hidden by a switcher.
    */
   readonly target?: WebuiBrowserTargetId;
+  /** Whether the current page has previous or next browser history entries. */
+  readonly canGoBack?: boolean;
+  readonly canGoForward?: boolean;
+  /** Return this web tab to its new-tab launcher. */
+  readonly onReturnToNewTab?: () => void | Promise<void>;
   /**
    * The url of the page the target is on, as the runtime last reported it.
    *
-   * The toolbar shows this as text and never as a field: the only address box
-   * in the workspace is the new tab page's. It arrives as a prop for the same
-   * reason the target does — the runtime publishes the url with the target, and
-   * the host reads both together so the toolbar and the frame describe the same
-   * navigation rather than a pair that has drifted.
+   * This seeds the editable toolbar field. The runtime publishes the url with
+   * the target, and the host reads both together so the toolbar and frame
+   * describe the same navigation rather than a pair that has drifted.
    */
   readonly url?: string;
   /**
@@ -174,6 +178,9 @@ export interface BrowserPanelHostProps {
 
 export function BrowserPanelHost({
   target: targetProp,
+  canGoBack,
+  canGoForward,
+  onReturnToNewTab,
   url: urlProp,
   port: portProp,
   runId: runIdProp,
@@ -404,6 +411,26 @@ export function BrowserPanelHost({
     [port, targetProp],
   );
 
+  const onNavigate = useCallback((input: string) => {
+    if (!targetProp) return;
+    const url = webuiBrowserAddressUrl(input);
+    if (!url) return;
+    void webuiBrowserToolbarRun({
+      send: port?.sendBrowserCommand,
+      target: targetProp,
+      command: "navigate",
+      params: { url },
+    }).catch((error: unknown) => {
+      dispatch({ type: "failed", error: toBrowserError(error) });
+    });
+  }, [port, targetProp]);
+
+  const onHome = useCallback(() => {
+    void Promise.resolve(onReturnToNewTab?.()).catch((error: unknown) => {
+      dispatch({ type: "failed", error: toBrowserError(error) });
+    });
+  }, [onReturnToNewTab]);
+
   const buildInput = useMemo(
     () =>
       // Bound to the page the person is looking at, and read at send time from
@@ -421,7 +448,11 @@ export function BrowserPanelHost({
         <WebuiBrowserToolbar
           url={urlProp}
           agentPage={agentPage}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
           onCommand={onToolbarCommand}
+          onNavigate={onNavigate}
+          onReturnToNewTab={onReturnToNewTab ? onHome : undefined}
         />
       ) : null}
       <BrowserPanel
@@ -448,9 +479,10 @@ export function BrowserPanelHost({
  */
 export function webuiBrowserToolbarRequest(
   target: WebuiBrowserTargetId,
-  command: WebuiBrowserToolbarCommand,
+  command: WebuiBrowserToolbarAction,
+  params?: Readonly<Record<string, unknown>>,
 ): WebuiBrowserCommandRequest {
-  return { surface: target.surface, command, target };
+  return { surface: target.surface, command, target, ...(params ? { params } : {}) };
 }
 
 /**
@@ -464,7 +496,8 @@ export function webuiBrowserToolbarRequest(
 export async function webuiBrowserToolbarRun(input: {
   readonly send: ((request: WebuiBrowserCommandRequest) => Promise<unknown>) | undefined;
   readonly target: WebuiBrowserTargetId;
-  readonly command: WebuiBrowserToolbarCommand;
+  readonly command: WebuiBrowserToolbarAction;
+  readonly params?: Readonly<Record<string, unknown>>;
 }): Promise<void> {
   if (!input.send) {
     throw {
@@ -473,7 +506,7 @@ export async function webuiBrowserToolbarRun(input: {
       retryable: false,
     } satisfies WebuiBrowserError;
   }
-  const answer = await input.send(webuiBrowserToolbarRequest(input.target, input.command));
+  const answer = await input.send(webuiBrowserToolbarRequest(input.target, input.command, input.params));
   // The runtime answers a browser action that could not be carried out with
   // `success: false` rather than with a refusal: an action that did not happen
   // is a fact about the action, and the Agent's tools read it as such. The
@@ -494,6 +527,28 @@ export async function webuiBrowserToolbarRun(input: {
   }
 }
 
+/**
+ * Resolves an address-bar entry to a supported URL or a Google search URL.
+ * Bare hostnames open directly; other plain text is treated as a search.
+ */
+export function webuiBrowserAddressUrl(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+  if (/^[a-z][a-z0-9+.-]*:(?:\/\/|$)/iu.test(trimmed)) return trimmed;
+
+  try {
+    const address = new URL(`https://${trimmed}`);
+    const isBareWebAddress = address.hostname === "localhost"
+      || address.hostname.includes(".")
+      || address.hostname.startsWith("[");
+    if (isBareWebAddress) return address.href;
+  } catch {
+    // Search text is not necessarily a valid URL.
+  }
+
+  return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+}
+
 /** Whether a value is a plain object the answer's fields can be read from. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -502,20 +557,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * The chrome above one page.
  *
- * The url is a `<span>`, not an `<input>`. A web tab is not somewhere a person
- * types a url: the address box is the new tab page's, and a field here would be
- * a second one that could disagree with it.
+ * The address is editable. Submitting it navigates the target this tab holds;
+ * the launcher supplies its own handler to open into its current tab.
  */
-function WebuiBrowserToolbar({
+export function WebuiBrowserToolbar({
   url,
   agentPage,
+  canGoBack,
+  canGoForward,
   onCommand,
+  onNavigate,
+  onReturnToNewTab,
+  disabled = false,
+  navigationDisabled = false,
 }: {
   readonly url?: string;
   /** The page the Agent is driving, when it is not the page in front. */
   readonly agentPage?: string;
-  readonly onCommand: (command: WebuiBrowserToolbarCommand) => void;
+  readonly canGoBack?: boolean;
+  readonly canGoForward?: boolean;
+  readonly onCommand?: (command: WebuiBrowserToolbarCommand) => void;
+  readonly onNavigate?: (input: string) => void;
+  readonly onReturnToNewTab?: () => void;
+  /** Disable the entire toolbar. */
+  readonly disabled?: boolean;
+  /** Disable history, reload and home actions while leaving the address editable. */
+  readonly navigationDisabled?: boolean;
 }): ReactElement {
+  const [address, setAddress] = useState(url ?? "");
+  useEffect(() => setAddress(url ?? ""), [url]);
+  const submitAddress = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const value = address.trim();
+    if (!disabled && value) onNavigate?.(value);
+  };
+
   return (
     <div
       className="webui-browser-toolbar"
@@ -529,28 +605,36 @@ function WebuiBrowserToolbar({
           type="button"
           className="webui-browser-toolbar-command"
           aria-label={TOOLBAR_COPY.commands[command]}
-          title={TOOLBAR_COPY.commands[command]}
           data-testid={`browser-toolbar-${command}`}
-          onClick={() => onCommand(command)}
+          disabled={disabled || navigationDisabled || (command === "back" ? canGoBack === false : command === "forward" ? canGoForward === false : false)}
+          onClick={() => onCommand?.(command)}
         >
           {TOOLBAR_GLYPHS[command]}
         </button>
       ))}
-      {/*
-        The address bar. It is a display, not a field — the only place a url is
-        typed is the new tab page's — so it is a rounded, quiet field with the
-        url in it, the way every browser draws one.
-      */}
-      <span className="webui-browser-omnibox" data-testid="browser-toolbar-omnibox">
+      <button
+        type="button"
+        className="webui-browser-toolbar-command"
+        aria-label={TOOLBAR_COPY.commands.home}
+        data-testid="browser-toolbar-home"
+        disabled={disabled || navigationDisabled || !onReturnToNewTab}
+        onClick={onReturnToNewTab}
+      >
+        <WebuiIconHome className="size-3" />
+      </button>
+      {/* The URL field is editable in web tabs and on the new tab page. */}
+      <form className="webui-browser-omnibox" data-testid="browser-toolbar-omnibox" onSubmit={submitAddress}>
         <WebuiIconGlobe className="webui-browser-omnibox-glyph size-3 shrink-0" />
-        <span
+        <input
           className="webui-browser-omnibox-url"
+          type="text"
           aria-label={TOOLBAR_COPY.urlLabel}
           data-testid="browser-toolbar-url"
-        >
-          {url ?? ""}
-        </span>
-      </span>
+          value={address}
+          disabled={disabled || !onNavigate}
+          onChange={(event) => setAddress(event.currentTarget.value)}
+        />
+      </form>
       {/*
         Which page the Agent is on. A real browser has one person and one
         page, so it has no such mark; this one has two, and the difference is
@@ -561,7 +645,6 @@ function WebuiBrowserToolbar({
         <span
           className="webui-browser-toolbar-agent"
           data-testid="browser-toolbar-agent"
-          title={TOOLBAR_COPY.agentPage}
           aria-label={`${TOOLBAR_COPY.agentPage}：${agentPage}`}
         >
           <span className="webui-browser-toolbar-agent-dot" aria-hidden="true" />

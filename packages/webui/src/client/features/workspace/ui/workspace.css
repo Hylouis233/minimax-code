@@ -245,8 +245,9 @@
   .webui-workspace-panel-body { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
   /* A web tab's content is a window: the browser panel fills the body, or the
    * page sits at the top of it with the panel's own surface underneath. */
-  .webui-workspace-web-tab { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
-  .webui-workspace-view { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: auto; }
+  .webui-workspace-web-tab { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: hidden; }
+  .webui-workspace-view { position: relative; display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; overflow: auto; }
+  .webui-workspace-web-tab[data-inactive="true"] { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
   .webui-workspace-file-toolbar { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; gap: var(--spacing_8); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); }
   .webui-workspace-file-breadcrumb { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: var(--spacing_8); overflow: hidden; color: var(--text_default_tertiary); font-size: var(--size_14); white-space: nowrap; }
   .webui-workspace-file-breadcrumb > span { display: inline-flex; min-width: 0; align-items: center; gap: var(--spacing_8); overflow: hidden; text-overflow: ellipsis; }
@@ -327,11 +328,10 @@
   .webui-turn-review-summary { display: flex; min-height: 48px; flex: 0 0 48px; align-items: center; justify-content: space-between; gap: var(--spacing_12); border-bottom: 1px solid var(--border_default); padding: 0 var(--spacing_16); color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-turn-review-files { min-width: 0; flex: 1 1 auto; overflow: auto; }
   .webui-turn-review-file { min-width: 0; border-bottom: 1px solid var(--border_default); }
-  .webui-turn-review-file-heading { position: sticky; top: 0; display: flex; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); cursor: pointer; list-style: none; }
-  .webui-turn-review-file-heading::-webkit-details-marker { display: none; }
+  .webui-turn-review-file-heading { position: sticky; top: 0; z-index: 1; display: flex; width: 100%; min-width: 0; min-height: 40px; align-items: center; gap: var(--spacing_8); border: 0; background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); cursor: pointer; font: inherit; text-align: left; }
   .webui-turn-review-chevron { width: 12px; height: 12px; flex: 0 0 12px; color: var(--icon_default_tertiary); transition: transform 120ms ease; }
-  .webui-turn-review-file[open] > .webui-turn-review-file-heading > .webui-turn-review-chevron { transform: rotate(90deg); }
-  .webui-turn-review-file-heading:hover { background: var(--bg_interaction_secondary_default); }
+  .webui-turn-review-file[data-expanded="true"] > .webui-turn-review-file-heading > .webui-turn-review-chevron { transform: rotate(90deg); }
+  .webui-turn-review-file-heading:hover { background: var(--bg_default_secondary); }
   .webui-turn-review-file-heading .webui-diff-file-icon { width: 18px; height: 18px; }
   .webui-turn-review-file-heading .webui-diff-file-icon .webui-workspace-filetype-badge { width: 18px; height: 18px; }
   .webui-turn-review-file-path { min-width: 0; flex: 1; overflow: hidden; font-size: var(--size_14); text-overflow: ellipsis; white-space: nowrap; }
@@ -358,8 +358,6 @@
   .webui-workspace-review-search { display: flex; flex: 0 0 auto; gap: var(--spacing_8); border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
   .webui-workspace-review-search input { min-width: 0; flex: 1; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_8); color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-workspace-review-search button { flex: 0 0 auto; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
-  .webui-turn-review .webui-workspace-review-search-results { flex: 0 0 auto; overflow: auto; border-bottom: 1px solid var(--border_light); padding: var(--spacing_8) var(--spacing_12); }
-  .webui-workspace-review-search-results button { max-width: 100%; overflow: hidden; color: var(--text_default_secondary); text-overflow: ellipsis; white-space: nowrap; }
   .webui-file-preview-line-active { display: inline-block; width: 100%; background: var(--bg_interaction_tertiary_selected); }
 
   .webui-workspace-panel-controls { position: absolute; top: 16px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; }

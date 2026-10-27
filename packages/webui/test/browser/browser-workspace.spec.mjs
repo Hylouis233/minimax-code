@@ -51,7 +51,9 @@ test("the browser control shows its browser glyph and opens a new tab page by de
   await openApp(page);
 
   const browserButton = page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" });
-  await expect(browserButton).toHaveAttribute("title", "浏览器");
+  // The control is an icon, so it carries its name in `aria-label` rather
+  // than in a tooltip title.
+  await expect(browserButton).toHaveAttribute("aria-label", "浏览器");
   // The control's glyph is the tabler browser icon. It used to be a globe
   // drawn as an SVG circle, and the library draws this one as paths, so the
   // assertion names the icon rather than the shape it happens to be made of.
@@ -107,7 +109,7 @@ test("the launcher's address box opens a page, and the panel is a window around 
 
   // The window: a toolbar with the url in an address bar, and the page.
   await expect(page.getByTestId("browser-toolbar")).toBeVisible();
-  await expect(page.getByTestId("browser-toolbar-url")).toHaveText("https://example.test/");
+  await expect(page.getByTestId("browser-toolbar-url")).toHaveValue("https://example.test/");
   await expect(page.getByTestId("browser-panel-frame")).toBeVisible();
 
   // A window has no heading above its page, and no list of the browser's pages
@@ -249,7 +251,7 @@ test("the strip shows the page the runtime published, and the panel follows it",
 
   // Choosing one brings its page to the front, and the address bar names it.
   await page.getByRole("tab", { name: "Another Page" }).click();
-  await expect(page.getByTestId("browser-toolbar-url")).toHaveText("https://another.test/");
+  await expect(page.getByTestId("browser-toolbar-url")).toHaveValue("https://another.test/");
   await expect(page.getByTestId("browser-panel-frame")).toBeVisible();
 });
 
@@ -288,7 +290,7 @@ test("a gesture names the page in front, not the page the Agent is on", async ({
   await openApp(page);
   await openPanel(page);
   await page.getByRole("tab", { name: "Person page" }).click();
-  await expect(page.getByTestId("browser-toolbar-url")).toHaveText("https://person.test/");
+  await expect(page.getByTestId("browser-toolbar-url")).toHaveValue("https://person.test/");
 
   await page.getByTestId("browser-panel-frame").click();
 

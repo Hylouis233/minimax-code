@@ -324,6 +324,8 @@ export class WebuiBrowserService {
         title: state?.title ?? "",
         url: state?.url ?? "",
         ...(state?.faviconUrl ? { faviconUrl: state.faviconUrl } : {}),
+        ...(state?.canGoBack !== undefined ? { canGoBack: state.canGoBack } : {}),
+        ...(state?.canGoForward !== undefined ? { canGoForward: state.canGoForward } : {}),
         selected: selected
           ? selected.surface === target.surface &&
             selected.browserId === target.browserId &&

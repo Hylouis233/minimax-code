@@ -122,7 +122,6 @@ export function WebuiWorkspaceDirectoryBrowser({
         ) : null}
         <span
           className="min-w-0 flex-1 truncate text-text_default_secondary text-size_12"
-          title={listing?.dir}
         >
           {listing?.dir ?? "正在读取目录…"}
         </span>

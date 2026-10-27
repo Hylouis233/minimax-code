@@ -68,17 +68,11 @@ import { webuiBrowserPicturePoint } from "../application/browser-commands.js";
 const PANEL_COPY = {
   title: "浏览器",
   frameLabel: "浏览器画面",
-  frameEmpty: "还没有画面。选择一个标签页，或等待浏览器推送第一帧。",
-  frameNoTarget: "没有选中的标签页。",
-  frameUnrenderable: "收到了一帧无法显示的画面数据，已忽略。",
   inputLabel: "浏览器输入区",
   unauthorized: "隔离浏览器未授权。请在设置的「浏览器」页中打开对应的浏览器开关。",
   absent: "当前运行时没有浏览器能力，浏览器面板不可用。",
   notReady: "浏览器能力尚未就绪（例如扩展未连接），面板暂时无法显示页面。",
   unknown: "当前运行时没有报告浏览器能力，面板按未授权处理。",
-  changed: (generation: number) =>
-    `标签页已更新到第 ${generation} 代，之前的输入不再有效。`,
-  dropped: (count: number) => `已丢弃 ${count} 帧过期画面。`,
 } as const;
 
 export interface BrowserPanelProps {
@@ -392,16 +386,6 @@ export function BrowserPanel({
         </p>
       ) : null}
 
-      {state?.targetChange ? (
-        <p className="webui-browser-notice" role="alert" data-testid="browser-panel-target-changed">
-          {PANEL_COPY.changed(state.targetChange.target.generation)}
-        </p>
-      ) : null}
-      {state?.droppedFrameCount ? (
-        <p className="webui-browser-notice" role="status" data-testid="browser-panel-dropped-frames">
-          {PANEL_COPY.dropped(state.droppedFrameCount)}
-        </p>
-      ) : null}
       {state?.error ? (
         <p
           className="webui-browser-notice is-error"
@@ -446,9 +430,7 @@ export function BrowserPanel({
             onKeyDown={onKeyDown}
           />
         ) : (
-        <p className="webui-browser-empty" role="status" data-testid="browser-panel-frame-empty">
-          {frame ? PANEL_COPY.frameUnrenderable : viewed ? PANEL_COPY.frameEmpty : PANEL_COPY.frameNoTarget}
-        </p>
+          <div data-testid="browser-panel-frame-empty" aria-hidden="true" />
         )}
       </div>
     </section>

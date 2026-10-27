@@ -417,14 +417,14 @@ describe("the terminal roster is read before it is shown", () => {
 
   it("does not paint an empty roster before the first answer lands", () => {
     // On a reload whose sessions still hold PTYs, an empty first paint reads as
-    // "all my terminals exited" and offers a create button that would exceed the
+    // "all my terminals exited" and invites a create that would exceed the
     // limit. The panel waits for the roster instead.
     expect(panelSource).toContain("terminalsReady");
-    expect(panelSource).toContain("{!terminalsReady ? <><p>{DESKTOP_COPY.terminalLoading}</p>");
-    // The standalone create button lives outside the ready/not-ready branch, so
-    // it is gated explicitly: offering it before the roster lands is what invites
-    // the create that exceeds the limit.
-    expect(panelSource).toContain("terminalsReady && terminals.length === 0");
+    expect(panelSource).toContain("{!terminalsReady ? DESKTOP_COPY.terminalLoading");
+    // The create waits for the roster too: the panel opens a terminal only once
+    // the first answer has landed, so a reload cannot open a second shell
+    // before the roster has said what is already running.
+    expect(panelSource).toContain("!terminalsReady || terminalTargetId");
   });
 
   it("drops a roster read that a later read has superseded", () => {
@@ -435,16 +435,20 @@ describe("the terminal roster is read before it is shown", () => {
     expect(panelSource).toContain("if (rosterRead.current !== read) return;");
   });
 
-  it("says the limit rather than discovering it through a refused create", () => {
-    // The panel knows the rule the process half enforces, so a full set is
-    // stated before the request instead of after it.
-    expect(panelSource).toContain("const DESKTOP_TERMINAL_LIMIT = 5;");
-    expect(panelSource).toContain("const terminalSlotsFull = terminals.length >= DESKTOP_TERMINAL_LIMIT;");
-    expect(panelSource).toContain("const terminalCreateDisabled = terminalSlotsFull || !terminalOwner?.canCreate;");
-    expect(panelSource).toContain("disabled={terminalCreateDisabled}");
-    // One helper, not three copies of the create-then-catch dance.
-    const createHandlers = panelSource.split("onClick={createTerminal}").length - 1;
-    expect(createHandlers).toBe(2);
-    expect(panelSource).not.toContain("terminalOwner.create(activeWorkspace).then");
+  it("states what the terminal service says rather than discovering a refusal", () => {
+    // The limit is the process half's rule now, so the panel keeps no copy of
+    // it. It asks the owner what it can do and says that answer — an absent
+    // service, a service that is not ready, an interface that does not match —
+    // instead of letting a refused create speak for itself.
+    expect(panelSource).toContain("terminalSupport");
+    expect(panelSource).toContain("terminalAvailability");
+    expect(panelSource).toContain("terminalError");
+    expect(panelSource).toContain("data-webui-terminal-availability={terminalSupport}");
+    // The create is gated by what the owner can do, so the panel never opens a
+    // terminal the service would refuse.
+    expect(panelSource).toContain("!terminalOwner?.canCreate");
+    // One create call, not a copy per button.
+    const createCalls = panelSource.split("terminalOwner.create(").length - 1;
+    expect(createCalls).toBe(1);
   });
 });
