@@ -1010,11 +1010,13 @@ it("a real agent turn resumes after refresh and drains a queued message in order
       .join("\n");
     // The attachment path is read out of the prompt the model stub received.
     // Non-string message content is JSON.stringify'd above, so on Windows the
-    // path arrives escaped (`path=\"C:\\Users\\…\"`): the capture may not
-    // exclude the backslash, and the doubled separators fold back to the real
-    // path (a no-op for POSIX separators).
-    const runtimeAttachmentPath = /<attachment name=\\?"runtime-note\.txt\\?"[^>]* path=\\?"([^"]+)"/u
-      .exec(referencePrompt)?.[1]?.replaceAll("\\\\", "\\");
+    // path arrives escaped (`path=\"C:\\Users\\…\"`). The opening quote's
+    // escape (if any) is captured and must close the value too, so the JSON
+    // escape before the closing quote never lands in the path on any platform;
+    // the doubled separators then fold back to the real path (a no-op for
+    // POSIX separators and for unescaped string content).
+    const runtimeAttachmentPath = /<attachment name=\\?"runtime-note\.txt\\?"[^>]* path=(\\?)"(.+?)\1"/u
+      .exec(referencePrompt)?.[2]?.replaceAll("\\\\", "\\");
     expect(runtimeAttachmentPath).toBeDefined();
     expect(await readFile(runtimeAttachmentPath!, "utf8")).toBe("Synthetic attachment body.");
     await expect.poll(async () => {
