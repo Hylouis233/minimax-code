@@ -64,6 +64,9 @@ const EXPECTED: Record<
     // deep link that opens one. Both belong to this business because both are
     // Mini App presentation facts, not layout ones.
     "watchMiniAppPresentation", "miniappStandaloneUrl",
+    // The presenter's asks come back to this client as a stream: the host
+    // decides to show a Mini App's session, and the client enacts it.
+    "watchMiniAppPresenter",
     // A Mini App is a plugin, so the catalogue's apps area writes the package
     // lifecycle through the same member the plugin manager does.
     "pluginManagement",

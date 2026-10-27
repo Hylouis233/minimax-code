@@ -28,7 +28,7 @@ import type { WebuiOperationPort } from "../../src/server/operation/bind-handler
 import { createStreamHandlerEntries } from "../../src/server/operation/handlers/stream.js";
 import { watchTerminalOperation } from "../../src/server/operation/workspace.js";
 import { watchBrowserFramesOperation, watchBrowserWebTabsOperation } from "../../src/server/operation/browser.js";
-import { watchMiniAppPresentationOperation } from "../../src/server/operation/miniapp.js";
+import { watchMiniAppPresentationOperation, watchMiniAppPresenterOperation } from "../../src/server/operation/miniapp.js";
 import { watchMiniAppAgentTurnOperation } from "../../src/server/operation/miniapp-agent.js";
 import {
   WEBUI_STREAM_OPERATION_NAMES,
@@ -118,7 +118,7 @@ describe("the unary request interface over OperationSpec", () => {
         `${name} is a stream and must not be unary`,
       );
     }
-    assert.equal(streams.length, 8);
+    assert.equal(streams.length, 9);
   });
 
   it("matches the server's registered stream descriptors exactly", () => {
@@ -128,6 +128,10 @@ describe("the unary request interface over OperationSpec", () => {
       watchBrowserFramesOperation.name,
       watchBrowserWebTabsOperation.name,
       watchMiniAppPresentationOperation.name,
+      // The presenter's own requests are a stream as well, and they keep a
+      // dedicated handler: the frames are the host's show/close asks, which the
+      // generic stream factory does not shape.
+      watchMiniAppPresenterOperation.name,
       // The page bridge's turn is a stream too, and it keeps a dedicated handler:
       // its frames are the runtime's run events plus one settlement, which the
       // generic stream factory does not shape.

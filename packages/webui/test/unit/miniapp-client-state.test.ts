@@ -211,6 +211,10 @@ describe("the Mini App business", () => {
       // The fixture's host issues no generation, and the bridge records that as
       // the unaddressable one rather than inventing a number.
       connection: 0,
+      // The lease revision travels with the presentation, because a frame that
+      // carries a newer one replaces this one. The fixture's host issues no
+      // revision either, so the unaddressable one is recorded here too.
+      presentationRevision: 0,
     });
 
     // The runtime stops it while the view is up. One read reconciles the view.
