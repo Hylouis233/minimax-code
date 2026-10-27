@@ -14,6 +14,7 @@
 
 import { useEffect, type ReactElement } from "react";
 
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import {
   useWebuiMiniAppWorkflows,
   useWebuiMiniAppWorkflowsState,
@@ -31,19 +32,23 @@ export function MiniAppAppsList({ onInstallRequest, selectedSessionId }: MiniApp
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const { rows, loading, error } = state.listing;
+  // The page's visibility is the platform's fact, not this component's: the
+  // dependency rules keep `document` out of the bindings, and the browser port
+  // already answers both questions this surface asks of it.
+  const { dom } = useWebuiBrowserCapabilities();
 
   useEffect(() => {
     void workflows?.loadListing();
     const refresh = () => {
-      if (document.visibilityState === "visible") void workflows?.loadListing();
+      if (!dom.isPageHidden()) void workflows?.loadListing();
     };
     window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
+    const stopVisibility = dom.listenForVisibilityChange(refresh);
     return () => {
       window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
+      stopVisibility();
     };
-  }, [workflows]);
+  }, [workflows, dom]);
 
   if (state.unavailable) return <p className="webui-plugin-empty">{state.unavailable}</p>;
   if (loading && rows.length === 0) {

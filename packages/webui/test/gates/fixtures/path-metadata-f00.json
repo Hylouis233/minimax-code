@@ -4988,6 +4988,15 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/features/miniapp/bindings/use-miniapp-catalogue.public.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-bindings",
+      "business": "miniapp",
+      "home": "target"
     }
   ],
   "directions": [

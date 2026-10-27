@@ -27,10 +27,7 @@ import type {
   WebuiPluginIntent,
 } from "../contracts/plugin-actions.js";
 import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
-import {
-  useWebuiMiniAppWorkflows,
-  useWebuiMiniAppWorkflowsState,
-} from "../../miniapp/bindings/use-miniapp-workflows.js";
+import { useWebuiMiniAppCatalogueSummary } from "../../miniapp/bindings/use-miniapp-catalogue.public.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -120,8 +117,7 @@ export function PluginCatalogue({
   // late answer cannot populate a replacement dialog.
   const workflows = useWebuiPluginWorkflows();
   const snapshot = useWebuiPluginWorkflowsState();
-  const miniAppWorkflows = useWebuiMiniAppWorkflows();
-  const miniAppState = useWebuiMiniAppWorkflowsState();
+  const miniAppCatalogue = useWebuiMiniAppCatalogueSummary();
   const listing = snapshot.listing;
   const data = listing.rows;
   const marketPluginTotal = listing.pluginTotal ?? 0;
@@ -133,7 +129,7 @@ export function PluginCatalogue({
   const busy = area === "apps" ? false : listing.loading || snapshot.mutating;
   const error = area === "apps" ? "" : localError || snapshot.mutationError || listing.error || "";
   const reload = async (): Promise<void> => {
-    if (area === "apps") await miniAppWorkflows?.loadListing();
+    if (area === "apps") await miniAppCatalogue.refresh();
     else await workflows?.loadListing({ area, view, query, category });
   };
   useEffect(() => {
@@ -424,7 +420,7 @@ export function PluginCatalogue({
           <PluginManagementFilters
             area={area}
             query={query}
-            rowCount={area === "apps" ? miniAppState.listing.rows.length : data.length}
+            rowCount={area === "apps" ? miniAppCatalogue.rowCount : data.length}
             onAreaChange={(nextArea) => {
               setLocalError("");
               setArea(nextArea);
