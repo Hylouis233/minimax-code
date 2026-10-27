@@ -20,6 +20,7 @@ import { MiniAppCleanupUnprovenError, markMiniAppRootTerminationProven } from '.
 import { sanitizeMiniAppRuntimeLogEvent } from '../../runtime-log.js';
 import type { MiniAppRunnerInitMessage } from './host-runner.js';
 import { waitForLoopbackReadiness } from './loopback-readiness.js';
+import { probeMiniAppPortOwnership } from './loopback-ownership.js';
 import { acquireMiniAppOwner, type MiniAppOwnerIdentity } from './owner-lease.js';
 import {
   createDirectNodeRootTerminator,
@@ -265,9 +266,14 @@ async function preparedRuntimeWithOwnership(
 ): Promise<MiniAppNodeRuntime> {
   // One credential per process generation: every port attempt reuses it.
   const loopbackToken = input.options.makeLoopbackToken();
+  const derivedPort = deterministicPort(input);
+  const firstCandidatePort = candidatePort(input, 0);
+  if (firstCandidatePort === derivedPort) {
+    await refuseIfPortIsOwnedElsewhere(input, derivedPort);
+  }
   let lastError: unknown;
   for (let index = 0; index < input.options.maxPortAttempts; index += 1) {
-    const port = candidatePort(input, index);
+    const port = index === 0 ? firstCandidatePort : candidatePort(input, index);
     const reservation = input.options.reservePort?.({
       pluginId: input.candidate.pluginId,
       port,
@@ -310,13 +316,42 @@ async function preparedRuntimeWithOwnership(
       attachStartupFailureDetail(error, failure);
       attempt?.startupErrorCapture.attachFailure(failure, error);
       lastError = failure;
-      if (!retryablePortError(failure) || index + 1 >= input.options.maxPortAttempts) throw failure;
+      if (!retryablePortError(failure)) throw failure;
+      // Only this plugin's deterministic port identifies its cross-client owner. A guarded
+      // listener on any fallback candidate can belong to a different Mini App.
+      if (port === derivedPort) await refuseIfPortIsOwnedElsewhere(input, port);
+      if (index + 1 >= input.options.maxPortAttempts) throw failure;
     }
   }
   throw (
     lastError ??
     new MiniAppNodeRuntimeError('NO_CANDIDATE_PORT', 'No Host-approved port is available')
   );
+}
+
+async function refuseIfPortIsOwnedElsewhere(
+  input: Parameters<typeof prepareRuntime>[0],
+  port: number,
+): Promise<void> {
+  throwIfAborted(input.signal);
+  const ownership = await probeMiniAppPortOwnership({
+    port,
+    timeoutMs: input.options.tcpConnectTimeoutMs,
+    signal: input.signal,
+  });
+  throwIfAborted(input.signal);
+  if (ownership === 'unknown') {
+    throw new MiniAppNodeRuntimeError(
+      'RUNNER_START_FAILED',
+      `Unable to verify whether Mini App ${input.candidate.pluginId} is already running in another client`,
+    );
+  }
+  if (ownership === 'guarded') {
+    throw new MiniAppNodeRuntimeError(
+      'OWNED_ELSEWHERE',
+      ownerHeldDetail(undefined, input.candidate.pluginId),
+    );
+  }
 }
 
 async function cleanupFailedAttempt(
@@ -865,12 +900,7 @@ function needsConnectorChannel(candidate: ProcessMiniAppCandidate): boolean {
 }
 
 function candidatePort(input: Parameters<typeof prepareRuntime>[0], index: number): number {
-  const preferred = input.preferredPort;
-  const digest = createHash('sha256').update(input.candidate.pluginId).digest();
-  const base =
-    preferred !== undefined && preferred >= PORT_MIN && preferred <= PORT_MAX
-      ? preferred
-      : PORT_MIN + (digest.readUInt32BE(0) % PORT_COUNT);
+  const base = deterministicPort(input);
   let available = 0;
   for (let offset = 0; offset < PORT_COUNT; offset += 1) {
     const port = PORT_MIN + ((base - PORT_MIN + offset) % PORT_COUNT);
@@ -879,6 +909,13 @@ function candidatePort(input: Parameters<typeof prepareRuntime>[0], index: numbe
     available += 1;
   }
   throw new MiniAppNodeRuntimeError('NO_CANDIDATE_PORT', 'No Host-approved port is available');
+}
+
+function deterministicPort(input: Parameters<typeof prepareRuntime>[0]): number {
+  const preferred = input.preferredPort;
+  if (preferred !== undefined && preferred >= PORT_MIN && preferred <= PORT_MAX) return preferred;
+  const digest = createHash('sha256').update(input.candidate.pluginId).digest();
+  return PORT_MIN + (digest.readUInt32BE(0) % PORT_COUNT);
 }
 
 function runnerEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

@@ -12,8 +12,10 @@ import { MINIAPP_LOOPBACK_HEALTH_PATH } from '../../contracts.js';
  *   plugin data.
  * - `foreign` — something else holds the port and does not answer like the guard. Not this Mini App;
  *   the runtime may pick another port.
+ * - `unknown` — the probe could not distinguish a listener from a free port; callers must fail
+ *   closed rather than start on a different port.
  */
-export type MiniAppPortOwnership = 'free' | 'guarded' | 'foreign';
+export type MiniAppPortOwnership = 'free' | 'guarded' | 'foreign' | 'unknown';
 
 export interface MiniAppPortProbeInput {
   readonly port: number;
@@ -32,10 +34,21 @@ export async function probeMiniAppPortOwnership(
   let status: number;
   try {
     status = await requestHealth(input);
-  } catch {
-    return 'free';
+  } catch (error) {
+    if (input.signal.aborted) throw input.signal.reason;
+    if (isConnectionRefused(error)) return 'free';
+    return 'unknown';
   }
   return status === 401 ? 'guarded' : 'foreign';
+}
+
+function isConnectionRefused(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'ECONNREFUSED'
+  );
 }
 
 function requestHealth(input: MiniAppPortProbeInput): Promise<number> {

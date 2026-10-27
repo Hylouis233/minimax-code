@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -35,6 +36,7 @@ class ScriptedChild extends EventEmitter {
     private readonly onExit: () => void,
     /** A child that accepts the init message and never reports readiness. */
     private readonly silent = false,
+    private readonly beforeStart?: (init: MiniAppRunnerInitMessage) => Promise<void>,
   ) {
     super();
   }
@@ -45,6 +47,7 @@ class ScriptedChild extends EventEmitter {
       this.received.push(init);
       if (this.silent) return true;
       try {
+        await this.beforeStart?.(init);
         this.runner = await startMiniAppModule(init, {
           loadModule: async () => ({
             start: async (context: { readonly listen: { host: string; port: number } }) => {
@@ -67,7 +70,11 @@ class ScriptedChild extends EventEmitter {
         });
       } catch (error) {
         callback?.(error as Error);
-        this.emit('message', { type: 'miniapp:error', code: 'RUNNER_START_FAILED', errorText: String(error) });
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error && error.code === 'EADDRINUSE'
+            ? 'EADDRINUSE'
+            : 'RUNNER_START_FAILED';
+        this.emit('message', { type: 'miniapp:error', code, errorText: String(error) });
         return false;
       }
       callback?.(null);
@@ -230,6 +237,105 @@ describe('Mini App process generations', () => {
 });
 
 describe('Mini App ownership before spawn', () => {
+  it('re-probes after a bind race and does not retry on another port', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp external race '));
+    let guardedServer: Server | undefined;
+    const child = new ScriptedChild(() => undefined, false, async (init) => {
+      guardedServer = createServer((_request, response) => {
+        response.writeHead(401).end();
+      });
+      await new Promise<void>((resolve, reject) => {
+        guardedServer?.once('error', reject);
+        guardedServer?.listen(init.listen.port, '127.0.0.1', resolve);
+      });
+    });
+    const adapter = createMiniAppNodeRuntimeAdapter({
+      resolvePluginDataDir: () => dataDir,
+      verifyCandidate: async () => true,
+      materializePackage: async ({ targetRoot }) => {
+        const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, 'export const start = async () => undefined;\n');
+      },
+      isPortReserved: () => false,
+      maxPortAttempts: 1,
+      spawn: () => child as unknown as ChildProcess,
+      createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+    });
+
+    try {
+      await expect(
+        adapter.prepare({
+          candidate: candidate(),
+          processGeneration: 'generation-bind-race',
+          preferredPort: 56_000,
+          signal: new AbortController().signal,
+          onLog: () => undefined,
+        }),
+      ).rejects.toMatchObject({ code: 'OWNED_ELSEWHERE' });
+      expect(child.received).toHaveLength(1);
+    } finally {
+      guardedServer?.closeAllConnections();
+      if (guardedServer) {
+        await new Promise<void>((resolve) => guardedServer?.close(() => resolve()));
+      }
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a guarded derived port owned by another client before retrying on a new port', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp external owner '));
+    let guardedServer: Server | undefined;
+    let guardedPort: number | undefined;
+    for (let port = 55_000; port < 56_000 && guardedServer === undefined; port += 1) {
+      const server = createServer((_request, response) => {
+        response.writeHead(401).end();
+      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(port, '127.0.0.1', resolve);
+        });
+        guardedServer = server;
+        guardedPort = port;
+      } catch {
+        server.closeAllConnections();
+      }
+    }
+    if (!guardedServer || guardedPort === undefined) throw new Error('Could not reserve a test port');
+
+    const child = new ScriptedChild(() => undefined);
+    const adapter = createMiniAppNodeRuntimeAdapter({
+      resolvePluginDataDir: () => dataDir,
+      verifyCandidate: async () => true,
+      materializePackage: async ({ targetRoot }) => {
+        const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, 'export const start = async () => undefined;\n');
+      },
+      isPortReserved: () => false,
+      spawn: () => child as unknown as ChildProcess,
+      createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+    });
+
+    try {
+      const preparation = adapter.prepare({
+        candidate: candidate(),
+        processGeneration: 'generation-external-owner',
+        preferredPort: guardedPort,
+        signal: new AbortController().signal,
+        onLog: () => undefined,
+      });
+
+      await expect(preparation).rejects.toMatchObject({ code: 'OWNED_ELSEWHERE' });
+      expect(child.received).toHaveLength(0);
+    } finally {
+      guardedServer.closeAllConnections();
+      await new Promise<void>((resolve) => guardedServer.close(() => resolve()));
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('refuses a Mini App another client owns, without spawning a process', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'miniapp owned '));
     const build = (child: ScriptedChild) =>

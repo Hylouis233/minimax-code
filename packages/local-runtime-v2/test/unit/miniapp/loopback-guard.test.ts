@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import http from 'node:http';
-import { createServer as createNetServer, connect as connectNet } from 'node:net';
+import { createServer as createNetServer, connect as connectNet, type Socket } from 'node:net';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -352,6 +352,31 @@ describe('Mini App port ownership', () => {
       expect(await probe(plainPort)).toBe('foreign');
     } finally {
       child.kill('SIGKILL');
+    }
+  });
+
+  it('reports a stalled listener as unknown rather than free', async () => {
+    const stalledPort = await freePort();
+    const sockets = new Set<Socket>();
+    const stalledServer = createNetServer((socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>((resolve, reject) => {
+      stalledServer.once('error', reject);
+      stalledServer.listen(stalledPort, '127.0.0.1', resolve);
+    });
+    try {
+      await expect(
+        probeMiniAppPortOwnership({
+          port: stalledPort,
+          timeoutMs: 10,
+          signal: new AbortController().signal,
+        }),
+      ).resolves.toBe('unknown');
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
     }
   });
 });
