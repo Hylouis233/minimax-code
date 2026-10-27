@@ -21,14 +21,30 @@ for (const state of ["absent", "not-ready"]) {
     }, state);
     await openApp(page);
     await openTerminal(page);
-    await expect(page.getByRole("button", { name: "新建终端", exact: true })).toBeDisabled();
+
+    // The terminal action is off: the panel says why it is off, and it opens
+    // no terminal and watches none.
     await expect(page.getByTestId("workspace-panel")).toContainText(state === "absent" ? "未提供终端" : "终端服务尚未就绪");
+    await expect.poll(() => page.evaluate(() => window.__fixture.terminals().length)).toBe(0);
+    expect(await page.evaluate(() => window.__fixture.watchedTerminalIds())).toEqual([]);
+
+    // Only that action is off: the rest of the client keeps working.
     await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeEnabled();
+
+    // The service comes back. The client re-reads the handshake, so the
+    // readiness refreshes and the panel stops saying the terminal is missing.
     await page.evaluate(() => {
       window.__fixture.setResponse("version", { version: "fixture", protocolVersion: 1, capabilities: { terminal: "supported" } });
       window.__fixture.dropAll();
     });
-    await expect(page.getByRole("button", { name: "新建终端", exact: true })).toBeEnabled();
+    await expect(page.getByTestId("workspace-panel")).not.toContainText(state === "absent" ? "未提供终端" : "终端服务尚未就绪", { timeout: 15_000 });
+
+    // And the action works again: the terminal opens for the tab that asked
+    // for it, and the panel watches it.
+    await page.getByRole("button", { name: "关闭面板" }).click();
+    await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
+    await expect.poll(() => page.evaluate(() => window.__fixture.terminals().length)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.__fixture.watchedTerminalIds().length)).toBe(1);
   });
 }
 
@@ -36,12 +52,16 @@ test("V19/V35 an older roster permits an unverified attempt and permission denia
   await configureFixture(page, () => window.__fixture.refuseOperation("createTerminal", "permission_denied", "Synthetic terminal permission denied"));
   await openApp(page);
   await openTerminal(page);
-  const create = page.getByRole("button", { name: "新建终端", exact: true });
-  await expect(create).toBeEnabled();
-  await create.click();
+
+  // An older service declares nothing, so the attempt is still permitted:
+  // the panel does not claim the terminal is missing, and the create goes out.
+  await expect(page.getByTestId("workspace-panel")).not.toContainText("未提供终端", { timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => window.__fixture.requests.some((request) => request.operation === "createTerminal"))).toBe(true);
+
+  // The refusal stays a call refusal: the panel reports it and nothing else
+  // stops working.
   await expect(page.getByTestId("workspace-panel")).toContainText("Synthetic terminal permission denied");
-  await expect(create).toBeEnabled();
-  await expect(page.getByTestId("workspace-panel")).not.toContainText("未提供终端");
+  await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeEnabled();
 });
 
 test("V29 protocol incompatibility is a startup failure before business ingress", async ({ page }) => {

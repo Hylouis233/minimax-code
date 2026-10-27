@@ -393,8 +393,11 @@ export function installFixtureTransport() {
     // would make every terminal vanish with the page that opened it, and the
     // cross-page assertion would then be asserting the fixture rather than the
     // client. The runtime's own shape is reproduced exactly — `{terminalId,
-    // status, output}` per `server/operation/handlers/terminal.ts` — because a
-    // roster that answered `{}` would only be testing the client's tolerance.
+    // status, output, workspaceTabId}` per `server/operation/handlers/terminal.ts`
+    // — because a roster that answered `{}` would only be testing the client's
+    // tolerance. The `workspaceTabId` is the tab the terminal was opened for:
+    // the client binds a terminal to the workspace tab that asked for it, and
+    // reads that binding back out of the roster.
     if (operation === "createTerminal") {
       const sequence = Number(window.localStorage.getItem(terminalSequenceKey) ?? "0") + 1;
       window.localStorage.setItem(terminalSequenceKey, String(sequence));
@@ -406,12 +409,18 @@ export function installFixtureTransport() {
         // The synthetic process returns a banner so the client can distinguish
         // an opened terminal from an empty xterm host.
         output: `synthetic shell ${terminalId}\r\n$ `,
+        ...(typeof body?.workspaceTabId === "string" ? { workspaceTabId: body.workspaceTabId } : {}),
       });
       writeTerminals(terminals);
       return { terminalId, status: "running" };
     }
     if (operation === "listTerminals")
-      return readTerminals().map(({ terminalId, status, output }) => ({ terminalId, status, output }));
+      return readTerminals().map(({ terminalId, status, output, workspaceTabId }) => ({
+        terminalId,
+        status,
+        output,
+        ...(typeof workspaceTabId === "string" ? { workspaceTabId } : {}),
+      }));
     if (operation === "writeTerminal") {
       // The echo is what makes a written byte observable in the browser: the
       // client sends it, and only a process that answers with it can prove the
@@ -823,7 +832,12 @@ export function installFixtureTransport() {
     },
     /** The PTY processes the runtime currently holds. */
     terminals() {
-      return readTerminals().map(({ terminalId, status, output }) => ({ terminalId, status, output }));
+      return readTerminals().map(({ terminalId, status, output, workspaceTabId }) => ({
+        terminalId,
+        status,
+        output,
+        ...(typeof workspaceTabId === "string" ? { workspaceTabId } : {}),
+      }));
     },
     /** Which terminals have at least one live watcher attached right now. */
     watchedTerminalIds() {

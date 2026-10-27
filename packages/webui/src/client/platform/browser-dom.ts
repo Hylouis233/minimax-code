@@ -102,6 +102,20 @@ export interface WebuiBrowserDom {
    */
   readonly readCssVariable: (name: string, fallback: string) => string;
   /**
+   * Resolves once the document's fonts have loaded.
+   *
+   * A terminal measures its grid after the fonts land: a measurement taken
+   * against fallback glyphs is a measurement of the wrong grid, and the shell
+   * that follows it resizes to a size the terminal never had. The wait
+   * belongs to the platform for the same reason the resize listener does — a
+   * component that reaches for `document` directly is a component that cannot
+   * be placed against anything but a browser.
+   *
+   * A platform with no document resolves at once: there are no fonts to wait
+   * for, so the caller measures the grid it has.
+   */
+  readonly whenFontsReady: () => Promise<void>;
+  /**
    * Creates a drawing surface.
    *
    * The share image is rendered on a canvas rather than in the DOM, so the
@@ -222,6 +236,11 @@ export function createWebuiBrowserDom(
         .getPropertyValue(name)
         .trim();
       return value || fallback;
+    },
+    whenFontsReady: () => {
+      const fonts = documentObject?.fonts;
+      if (!fonts) return Promise.resolve();
+      return fonts.ready.then(() => undefined);
     },
     createCanvas: (width, height) => {
       if (!documentObject) return null;
