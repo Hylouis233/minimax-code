@@ -538,8 +538,8 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
       "open_tab",
       { url: pageUrl("second page") },
     );
-    const second = opened.result as WebuiBrowserTargetId;
-    expect(second.targetId).not.toBe(first!.targetId);
+    const secondTab = opened.result as WebuiBrowserTargetId;
+    expect(secondTab.targetId).not.toBe(first!.targetId);
 
     const firstFrames: WebuiBrowserImageFrame[] = [];
     const secondFrames: WebuiBrowserImageFrame[] = [];
@@ -565,16 +565,34 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
     await repaint();
     await waitFor(() => firstFrames.length > 0, "a picture of the first page");
 
+    // The page behind a new tab lands its first load after the tab was
+    // opened, and the provider reads that landing as a replaced page: the
+    // generation moves with it, and the identity `open_tab` answered with is a
+    // generation behind by the time the row gets to use it. The service
+    // refuses such an identity and says what to do about it — select the
+    // target again — so the row reads the identity the service holds for the
+    // tab, selects that one, and watches that one.
+    let second: WebuiBrowserTargetId | undefined;
+    await waitFor(async () => {
+      const listed = await service.listTargets("isolated-chromium", "run-1");
+      const current = listed.targets.find(
+        (candidate) => candidate.id.targetId === secondTab.targetId,
+      );
+      if (!current) return false;
+      await service.selectTarget(current.id, "run-1");
+      second = current.id;
+      return true;
+    }, "the second page to become the run's selection");
+
     const secondStream = (async () => {
       for await (const frame of service.watchFrames(
         "isolated-chromium",
-        second,
+        second!,
         controller.signal,
       )) {
         secondFrames.push(frame);
       }
     })();
-    await service.selectTarget(second, "run-1");
     await repaint();
     await waitFor(() => secondFrames.length > 0, "a picture of the second page");
 
@@ -585,7 +603,7 @@ describe.skipIf(!available)("the browser service, streaming two pages of one Chr
     expect(secondFrames.length).toBeGreaterThan(0);
     // Neither stream received the other page's picture.
     expect(firstFrames.every((frame) => frame.target.targetId === first!.targetId)).toBe(true);
-    expect(secondFrames.every((frame) => frame.target.targetId === second.targetId)).toBe(true);
+    expect(secondFrames.every((frame) => frame.target.targetId === secondTab.targetId)).toBe(true);
   });
 });
 
