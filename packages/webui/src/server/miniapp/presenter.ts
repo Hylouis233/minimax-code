@@ -1,8 +1,14 @@
+import { randomUUID } from "node:crypto";
+
 /** What the panel is showing: one Mini App of one session. */
 export interface MiniAppPresentation {
   readonly sessionId: string;
   readonly pluginId: string;
 }
+
+export type MiniAppPresentationIntent =
+  | { readonly epoch: string; readonly revision: number; readonly action: "open"; readonly sessionId: string; readonly pluginId: string }
+  | { readonly epoch: string; readonly revision: number; readonly action: "close"; readonly pluginId: string; readonly sessionId: string };
 
 /**
  * The browser implementation of the host-owned Mini App presenter.
@@ -25,6 +31,9 @@ export interface MiniAppPresenterLike {
 export interface MiniAppPresenterView {
   /** The Mini App the panel is showing, or undefined when it shows none. */
   presented(): MiniAppPresentation | undefined;
+  /** Current intent plus notifications, consumed by the WebUI client watcher. */
+  snapshot(): MiniAppPresentationIntent | undefined;
+  subscribe(listener: (intent: MiniAppPresentationIntent) => void): () => void;
   readonly presenter: MiniAppPresenterLike;
 }
 
@@ -49,19 +58,47 @@ export interface CreateMiniAppPresenterInput {
  * currently presented.
  */
 export function createMiniAppPresenter(input: CreateMiniAppPresenterInput): MiniAppPresenterView {
+  const epoch = randomUUID();
   let presentation: MiniAppPresentation | undefined;
+  let revision = 0;
+  let latestIntent: MiniAppPresentationIntent | undefined;
+  const listeners = new Set<(intent: MiniAppPresentationIntent) => void>();
+
+  const publish = (intent: MiniAppPresentationIntent): void => {
+    for (const listener of listeners) listener(intent);
+  };
 
   return {
     presented: () => presentation,
+    snapshot: () => latestIntent,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     presenter: {
       async open(openInput) {
         openInput.signal?.throwIfAborted();
         presentation = { sessionId: openInput.sessionId, pluginId: openInput.pluginId };
+        revision += 1;
+        const intent: MiniAppPresentationIntent = { action: "open", epoch, revision, ...presentation };
+        latestIntent = intent;
+        publish(intent);
         input.selectSession?.({ sessionId: openInput.sessionId, pluginId: openInput.pluginId });
       },
       async close(closeInput) {
         if (presentation?.pluginId !== closeInput.pluginId) return;
+        const { sessionId } = presentation;
         presentation = undefined;
+        revision += 1;
+        const intent: MiniAppPresentationIntent = {
+          action: "close",
+          epoch,
+          revision,
+          pluginId: closeInput.pluginId,
+          sessionId,
+        };
+        latestIntent = intent;
+        publish(intent);
         input.onClosed?.({ pluginId: closeInput.pluginId });
       },
     },

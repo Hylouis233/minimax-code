@@ -15,6 +15,7 @@ export {
   openMiniAppOperation,
   stopMiniAppOperation,
   watchMiniAppPresentationOperation,
+  watchMiniAppPresenterOperation,
 } from "./miniapp.js";
 export { getPermissionModeOperation, setPermissionModeOperation } from "./permission-mode.js";
 export { getGlobalInstructionsOperation, setGlobalInstructionsOperation } from "./personalization.js";
@@ -49,6 +50,7 @@ import type {
 import type { WebuiTerminalProcessPort } from "../../runtime/port.js";
 import type { WebuiBrowserPort } from "../../runtime/port.js";
 import type { MiniAppProxyRegistry } from "../miniapp/proxy-registry.js";
+import type { MiniAppPresenterView } from "../miniapp/presenter.js";
 export {
   getSigninPanelOperation,
   claimSigninOperation,
@@ -99,6 +101,7 @@ export function createOperationRegistry(
    * omitting it leaves the Mini App handlers holding a private registry.
    */
   miniAppProxies?: MiniAppProxyRegistry,
+  miniAppPresenter?: MiniAppPresenterView,
 ): ReadonlyMap<string, WebuiOperationRegistryEntry> {
   const registry = new Map<string, WebuiOperationRegistryEntry>();
   /**
@@ -120,6 +123,7 @@ export function createOperationRegistry(
     ...createMessageHandlerEntries(port),
     ...createMiniAppHandlerEntries(port, {
       ...(miniAppProxies ? { proxies: miniAppProxies } : {}),
+      ...(miniAppPresenter ? { presenter: miniAppPresenter } : {}),
       connections: miniAppConnections,
       panels: miniAppPanels,
       runs: miniAppRuns,
@@ -311,6 +315,7 @@ export function createOperationRegistry(
   registerOperation(registry, entry("openMiniApp"));
   registerOperation(registry, entry("stopMiniApp"));
   registerOperation(registry, entry("watchMiniAppPresentation"));
+  registerOperation(registry, entry("watchMiniAppPresenter"));
   // The page bridge, appended so the registry order before it is unchanged.
   registerOperation(registry, entry("watchMiniAppAgentTurn"));
   registerOperation(registry, entry("miniAppAgentCall"));

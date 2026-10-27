@@ -52,6 +52,8 @@ export interface WebuiMiniAppSummary {
     readonly kind: "process";
     readonly status: WebuiMiniAppRuntimeStatus;
     readonly errorCode?: string;
+    readonly ownership?: "other-client";
+    readonly ownerClient?: string;
   };
 }
 
@@ -100,17 +102,36 @@ export interface WebuiMiniAppCatalogue {
  * else's presentation. There is no `detached` field because this document *is* the
  * standalone presentation — the fact is the connection.
  *
- * `session` is `"ended"` only when the runtime confirmed there is no such session.
- * A lookup that failed for any other reason is a failure, not an ended session.
- * Either way the answer is reported rather than enforced: the Mini App is
- * plugin-scoped, so a page outlives the session it was opened from (ADR 0020).
+ * `session` is `"ended"` only when the runtime confirmed there is no such session;
+ * `"unresolved"` means lookup failed for another reason. Either way the answer is
+ * reported rather than enforced: the Mini App is plugin-scoped, so a page outlives
+ * the session it was opened from (ADR 0020).
  */
 export interface WebuiMiniAppPresentationState {
   readonly pluginId: string;
   readonly sessionId: string;
   readonly presentationRevision: number;
-  readonly session: "live" | "ended";
+  readonly session: "live" | "ended" | "unresolved";
 }
+
+/** A server-owned request for the client to show or close an agent-started app. */
+export type WebuiMiniAppPresentationIntent =
+  | {
+      /** Changes whenever the host service process that owns the presenter changes. */
+      readonly epoch: string;
+      readonly revision: number;
+      readonly action: "open";
+      readonly sessionId: string;
+      readonly pluginId: string;
+    }
+  | {
+      /** Changes whenever the host service process that owns the presenter changes. */
+      readonly epoch: string;
+      readonly revision: number;
+      readonly action: "close";
+      readonly pluginId: string;
+      readonly sessionId: string;
+    };
 
 /**
  * What `openMiniApp` hands the client: the proxy's own loopback URL.

@@ -18,20 +18,31 @@ import {
   useWebuiMiniAppWorkflows,
   useWebuiMiniAppWorkflowsState,
 } from "../bindings/use-miniapp-workflows.js";
-import { webuiMiniAppRefusalText } from "../projection/miniapp-view.js";
+import { webuiMiniAppRefusalText, webuiMiniAppWindowName } from "../projection/miniapp-view.js";
 
 export interface MiniAppAppsListProps {
   /** Offered when the catalogue can switch to the plugin marketplace. */
   readonly onInstallRequest?: () => void;
+  /** The session the standalone Mini App page should present. */
+  readonly selectedSessionId?: string;
 }
 
-export function MiniAppAppsList({ onInstallRequest }: MiniAppAppsListProps): ReactElement {
+export function MiniAppAppsList({ onInstallRequest, selectedSessionId }: MiniAppAppsListProps): ReactElement {
   const workflows = useWebuiMiniAppWorkflows();
   const state = useWebuiMiniAppWorkflowsState();
   const { rows, loading, error } = state.listing;
 
   useEffect(() => {
     void workflows?.loadListing();
+    const refresh = () => {
+      if (document.visibilityState === "visible") void workflows?.loadListing();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [workflows]);
 
   if (state.unavailable) return <p className="webui-plugin-empty">{state.unavailable}</p>;
@@ -61,6 +72,11 @@ export function MiniAppAppsList({ onInstallRequest }: MiniAppAppsListProps): Rea
       <div className="webui-plugin-list">
         {rows.map((row) => {
           const refusal = state.refusals[row.pluginId];
+          const opened = state.presentations[row.pluginId];
+          const standaloneHref =
+            opened?.kind === "open" && selectedSessionId
+              ? workflows?.standaloneUrl({ pluginId: row.pluginId, sessionId: selectedSessionId })
+              : undefined;
           return (
             <article className="webui-plugin-row" key={`apps-${row.pluginId}`} data-testid={`miniapp-app-${row.pluginId}`}>
               <div className="webui-plugin-icon" aria-hidden="true">
@@ -91,23 +107,20 @@ export function MiniAppAppsList({ onInstallRequest }: MiniAppAppsListProps): Rea
                 {row.enabled ? (<>
                 <button
                   type="button"
-                  disabled={state.opening === row.pluginId}
+                  data-testid={`miniapp-app-open-${row.pluginId}`}
+                  disabled={state.opening === row.pluginId || row.ownedElsewhere}
+                  title={row.ownedElsewhere ? `另一个客户端${row.ownerClient ? `（${row.ownerClient}）` : ""}正在运行此 Mini App` : undefined}
                   onClick={() => void workflows?.open(row.pluginId)}
                 >
-                  打开
+                  {row.ownedElsewhere ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}` : "打开"}
                 </button>
-                {state.presentations[row.pluginId]?.kind === "open" ? (
+                {opened?.kind === "open" && standaloneHref !== undefined ? (
                   <button
                     type="button"
+                    aria-label="查看"
+                    title="在独立标签页中查看 Mini App"
                     onClick={() => {
-                      // Already started by the click above, so this is a plain
-                      // gesture and the browser opens the page rather than
-                      // blocking it. The catalogue has no workspace panel, so the
-                      // started page is shown in its own browser tab — the
-                      // standalone presentation in its simplest form. The
-                      // deep-linked client tab is ADR 0020's later ticket.
-                      const opened = state.presentations[row.pluginId];
-                      if (opened?.kind === "open") window.open(opened.viewUrl, "_blank", "noopener");
+                      window.open(standaloneHref, webuiMiniAppWindowName(row.pluginId));
                     }}
                   >
                     查看

@@ -15,7 +15,10 @@
 
 import type { WebuiDeliveryHandle } from "../features/turn/contracts/execution-port.js";
 import type { WebuiStreamFrame } from "../../shared/contracts/stream.js";
-import type { WebuiMiniAppPresentationState } from "../../shared/contracts/miniapp.js";
+import type {
+  WebuiMiniAppPresentationIntent,
+  WebuiMiniAppPresentationState,
+} from "../../shared/contracts/miniapp.js";
 import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
@@ -179,6 +182,11 @@ export interface WebuiWire {
     operation: string,
     requestBody: { readonly pluginId: string; readonly sessionId: string },
     onFrame: (state: WebuiMiniAppPresentationState) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void;
+  watchMiniAppPresenter(
+    operation: string,
+    onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
     onFailure?: (error: Error) => void,
   ): () => void;
   /**
@@ -573,8 +581,29 @@ export function createWebuiWire({
     onFailure?: (error: Error) => void,
   ): () => void {
     let stopped = false;
-    const session = openWireSession(operation, requestBody, {
-      frame: (session, frame) => {
+    let session: WebuiWireSession | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryDelayMs = 250;
+    let failureReported = false;
+    const reconnect = (currentSession: WebuiWireSession | undefined, error: Error): void => {
+      if (stopped) return;
+      if (retryTimer !== undefined) return;
+      if (!failureReported) {
+        failureReported = true;
+        onFailure?.(error);
+      }
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        if (stopped) return;
+        open();
+        retryDelayMs = Math.min(retryDelayMs * 2, 5_000);
+      }, retryDelayMs);
+      currentSession?.close();
+    };
+    const open = (): void => {
+      session = openWireSession(operation, requestBody, {
+      frame: (currentSession, frame) => {
         if (stopped) return;
         if (frame.kind === "error") {
           // A refusal is a failure, not an absent lease: the service could not
@@ -582,7 +611,7 @@ export function createWebuiWire({
           // caller read a broken host as a closed tab. The socket is closed with
           // it, because nothing is being held on the other end.
           stopped = true;
-          session.close();
+          currentSession.close();
           onFailure?.(
             new WebuiWireError(
               frame.code,
@@ -593,12 +622,29 @@ export function createWebuiWire({
           return;
         }
         if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+        failureReported = false;
+        if (stableTimer !== undefined) clearTimeout(stableTimer);
+        stableTimer = setTimeout(() => {
+          stableTimer = undefined;
+          retryDelayMs = 250;
+        }, 10_000);
         onFrame(frame.body as WebuiMiniAppPresentationState);
       },
-    });
+      invalidFrame: (currentSession, reason) => {
+        reconnect(currentSession, rejectionError(reason, operation));
+      },
+      closed: (currentSession) =>
+        reconnect(currentSession, new WebuiWireError("runtime_unavailable", `${operation} connection closed`)),
+      failed: (currentSession) =>
+        reconnect(currentSession, new WebuiWireError("runtime_unavailable", `${operation} connection failed`)),
+      });
+    };
+    open();
     return () => {
       stopped = true;
-      session.close();
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      if (stableTimer !== undefined) clearTimeout(stableTimer);
+      session?.close();
     };
   }
 
@@ -609,6 +655,12 @@ export function createWebuiWire({
     onFailure?: (error: Error) => void,
   ): () => void {
     let stopped = false;
+    const transportFailure = (session: WebuiWireSession, message: string): void => {
+      if (stopped) return;
+      stopped = true;
+      session.close();
+      onFailure?.(new WebuiWireError("result_unknown", message));
+    };
     const session = openWireSession(operation, requestBody, {
       frame: (session, frame) => {
         if (stopped) return;
@@ -632,10 +684,73 @@ export function createWebuiWire({
         if (decoded.kind === "settled" || decoded.kind === "failure") stopped = true;
         onFrame(decoded);
       },
+      invalidFrame: (session) =>
+        transportFailure(session, `${operation} returned an invalid turn frame`),
+      closed: (session) =>
+        transportFailure(session, `${operation} connection closed before settlement`),
+      failed: (session) =>
+        transportFailure(session, `${operation} connection failed before settlement`),
     });
     return () => {
       stopped = true;
       session.close();
+    };
+  }
+
+  function watchMiniAppPresenter(
+    operation: string,
+    onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
+    onFailure?: (error: Error) => void,
+  ): () => void {
+    let stopped = false;
+    let session: WebuiWireSession | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let delayMs = 250;
+    let failureReported = false;
+    const reconnect = (current: WebuiWireSession, error: Error): void => {
+      if (stopped || retryTimer !== undefined) return;
+      if (!failureReported) {
+        failureReported = true;
+        onFailure?.(error);
+      }
+      current.close();
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        if (!stopped) open();
+        delayMs = Math.min(delayMs * 2, 5_000);
+      }, delayMs);
+    };
+    const open = (): void => {
+      session = openWireSession(operation, undefined, {
+        frame: (current, frame) => {
+          if (stopped) return;
+          if (frame.kind === "error") {
+            stopped = true;
+            current.close();
+            onFailure?.(new WebuiWireError(frame.code, frame.message ?? `${operation} refused`));
+            return;
+          }
+          if (frame.kind !== "event" || !frame.body || typeof frame.body !== "object") return;
+          failureReported = false;
+          if (stableTimer !== undefined) clearTimeout(stableTimer);
+          stableTimer = setTimeout(() => {
+            stableTimer = undefined;
+            delayMs = 250;
+          }, 10_000);
+          onFrame(frame.body as WebuiMiniAppPresentationIntent);
+        },
+        invalidFrame: (current, reason) => reconnect(current, rejectionError(reason, operation)),
+        closed: (current) => reconnect(current, new WebuiWireError("runtime_unavailable", `${operation} connection closed`)),
+        failed: (current) => reconnect(current, new WebuiWireError("runtime_unavailable", `${operation} connection failed`)),
+      });
+    };
+    open();
+    return () => {
+      stopped = true;
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+      if (stableTimer !== undefined) clearTimeout(stableTimer);
+      session?.close();
     };
   }
 
@@ -676,6 +791,7 @@ export function createWebuiWire({
     watchBrowserFrames,
     watchBrowserWebTabs,
     watchMiniAppPresentation,
+    watchMiniAppPresenter,
     watchMiniAppAgentTurn,
     workspaceFileUrl,
     miniappStandaloneUrl,

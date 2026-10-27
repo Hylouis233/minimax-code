@@ -43,6 +43,10 @@ export interface WebuiMiniAppRow {
    * fails.
    */
   readonly enabled: boolean;
+  /** The runtime guard confirms another client owns this plugin's process. */
+  readonly ownedElsewhere: boolean;
+  /** Owner's client label, when the live process lease exposes it. */
+  readonly ownerClient?: string;
   /**
    * True while a standalone presentation of this Mini App is live (ADR 0020).
    *
@@ -85,9 +89,17 @@ export function webuiMiniAppRows(
       ...(miniApp.iconUrl !== undefined ? { iconUrl: miniApp.iconUrl } : {}),
       status: miniApp.runtime.status,
       ...(miniApp.runtime.errorCode !== undefined ? { errorCode: miniApp.runtime.errorCode } : {}),
-      statusLabel: enabled ? webuiMiniAppStatusLabel(miniApp.runtime.status) : "已停用",
+      statusLabel: !enabled
+        ? "已停用"
+        : miniApp.runtime.ownership === "other-client"
+          ? miniApp.runtime.ownerClient
+          ? `其他客户端运行中（${miniApp.runtime.ownerClient}）`
+            : "其他客户端运行中"
+          : webuiMiniAppStatusLabel(miniApp.runtime.status),
       running: enabled && miniApp.runtime.status === "running",
       enabled,
+      ownedElsewhere: miniApp.runtime.ownership === "other-client",
+      ...(miniApp.runtime.ownerClient ? { ownerClient: miniApp.runtime.ownerClient } : {}),
       detached: miniApp.detached,
       presentationRevision: miniApp.presentationRevision,
     };

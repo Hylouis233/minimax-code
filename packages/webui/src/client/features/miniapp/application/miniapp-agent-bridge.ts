@@ -26,6 +26,7 @@
 import {
   isMiniAppAgentFailureCode,
   isMiniAppAgentPermissionDecision,
+  isMiniAppAgentRequestId,
   MINIAPP_AGENT_MAX_TEXT_LENGTH,
   readMiniAppAgentAnswers,
   readMiniAppAgentCreateRequest,
@@ -40,6 +41,7 @@ import {
   isWebuiMiniAppAgentTurnMethod,
   readWebuiMiniAppAgentBridgeRequest,
   WEBUI_MINIAPP_AGENT_MAX_ID_LENGTH,
+  WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
   WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
   WEBUI_MINIAPP_BRIDGE_AGENT_RESULT,
   type WebuiMiniAppAgentBridgeRequest,
@@ -133,6 +135,8 @@ export function createWebuiMiniAppAgentBridge(
 ): WebuiMiniAppAgentBridgeHost {
   /** One detach per in-flight turn, so a teardown can end exactly those. */
   const turns = new Map<string, () => void>();
+  /** Request ids are shared across short calls and streamed turns. */
+  const inFlightIds = new Set<string>();
   let closed = false;
 
   function postToPage(message: unknown): void {
@@ -179,6 +183,7 @@ export function createWebuiMiniAppAgentBridge(
     const settle = (result: WebuiMiniAppAgentBridgeResult): void => {
       live = false;
       turns.delete(requestId);
+      inFlightIds.delete(requestId);
       answer(requestId, result);
     };
     const detach = input.commands.watchTurn(
@@ -315,7 +320,7 @@ export function createWebuiMiniAppAgentBridge(
       return;
     }
     // Two calls sharing an id would also share its events and its settlement.
-    if (turns.has(request.requestId)) {
+    if (inFlightIds.has(request.requestId)) {
       answer(request.requestId, { ok: false, code: "busy" });
       return;
     }
@@ -325,6 +330,7 @@ export function createWebuiMiniAppAgentBridge(
         answer(request.requestId, { ok: false, code: "invalid_request" });
         return;
       }
+      inFlightIds.add(request.requestId);
       startTurn(request, body);
       return;
     }
@@ -333,6 +339,7 @@ export function createWebuiMiniAppAgentBridge(
       answer(request.requestId, { ok: false, code: "invalid_request" });
       return;
     }
+    inFlightIds.add(request.requestId);
     void input.commands.call(body).then(
       (response) => {
         answer(
@@ -350,7 +357,7 @@ export function createWebuiMiniAppAgentBridge(
         // A transport failure on a call that may have applied: the code says so.
         answer(request.requestId, { ok: false, code: "result_unknown" });
       },
-    );
+    ).finally(() => inFlightIds.delete(request.requestId));
   }
 
   return {
@@ -367,7 +374,23 @@ export function createWebuiMiniAppAgentBridge(
         return;
       }
       const request = readWebuiMiniAppAgentBridgeRequest(event.data);
-      if (request) dispatch(request);
+      if (request) {
+        dispatch(request);
+        return;
+      }
+      if (
+        event.data &&
+        typeof event.data === "object" &&
+        !Array.isArray(event.data)
+      ) {
+        const raw = event.data as Record<string, unknown>;
+        if (
+          raw.type === WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST &&
+          isMiniAppAgentRequestId(raw.requestId)
+        ) {
+          answer(raw.requestId, { ok: false, code: "invalid_request" });
+        }
+      }
     },
     handleDocumentReplaced() {
       if (closed) return;
@@ -383,12 +406,14 @@ export function createWebuiMiniAppAgentBridge(
       }
       for (const detach of turns.values()) detach();
       turns.clear();
+      inFlightIds.clear();
     },
     close() {
       if (closed) return;
       closed = true;
       for (const detach of turns.values()) detach();
       turns.clear();
+      inFlightIds.clear();
     },
     inFlight: () => [...turns.keys()],
   };

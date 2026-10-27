@@ -27,6 +27,10 @@ import type {
   WebuiPluginIntent,
 } from "../contracts/plugin-actions.js";
 import { MiniAppAppsList } from "../../miniapp/ui/MiniAppAppsList.public.js";
+import {
+  useWebuiMiniAppWorkflows,
+  useWebuiMiniAppWorkflowsState,
+} from "../../miniapp/bindings/use-miniapp-workflows.js";
 
 type Area = "plugins" | "skills" | "apps" | "mcp" | "agents";
 type PluginCatalogueSelection = {
@@ -59,9 +63,11 @@ const sameSelection = (
 export function PluginCatalogue({
   initialArea = "plugins",
   onChatWithAgent,
+  selectedSessionId,
 }: {
   readonly initialArea?: Area;
   readonly onChatWithAgent?: (name: string) => Promise<void>;
+  readonly selectedSessionId?: string;
 }): ReactElement {
   const [area, setArea] = useState<Area>(initialArea);
   const [view, setView] = useState<"market" | "personal">("market");
@@ -114,6 +120,8 @@ export function PluginCatalogue({
   // late answer cannot populate a replacement dialog.
   const workflows = useWebuiPluginWorkflows();
   const snapshot = useWebuiPluginWorkflowsState();
+  const miniAppWorkflows = useWebuiMiniAppWorkflows();
+  const miniAppState = useWebuiMiniAppWorkflowsState();
   const listing = snapshot.listing;
   const data = listing.rows;
   const marketPluginTotal = listing.pluginTotal ?? 0;
@@ -122,12 +130,14 @@ export function PluginCatalogue({
    * listing came back complete. `null` means "the total is not knowable from
    * this response" and the label falls back to a bare 「查看全部技能」. */
   const marketSkillTotal = listing.skillTotal ?? null;
-  const busy = listing.loading || snapshot.mutating;
-  const error = localError || snapshot.mutationError || listing.error || "";
+  const busy = area === "apps" ? false : listing.loading || snapshot.mutating;
+  const error = area === "apps" ? "" : localError || snapshot.mutationError || listing.error || "";
   const reload = async (): Promise<void> => {
-    await workflows?.loadListing({ area, view, query, category });
+    if (area === "apps") await miniAppWorkflows?.loadListing();
+    else await workflows?.loadListing({ area, view, query, category });
   };
   useEffect(() => {
+    if (area === "apps") return;
     void workflows?.loadListing({ area, view, query, category });
   }, [area, view, query, category, workflows]);
   const catalogueView = useMemo(
@@ -414,7 +424,7 @@ export function PluginCatalogue({
           <PluginManagementFilters
             area={area}
             query={query}
-            rowCount={data.length}
+            rowCount={area === "apps" ? miniAppState.listing.rows.length : data.length}
             onAreaChange={(nextArea) => {
               setLocalError("");
               setArea(nextArea);
@@ -588,6 +598,7 @@ export function PluginCatalogue({
         /* The apps area belongs to the Mini App business: it renders that
            business's published list, and this page holds none of its state. */
         <MiniAppAppsList
+          selectedSessionId={selectedSessionId}
           onInstallRequest={() => {
             setManagementOpen(false);
             setArea("plugins");

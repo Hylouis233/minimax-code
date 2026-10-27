@@ -48,6 +48,10 @@ class ControllableSocket {
     this.emit("close", {});
   }
 
+  fail(): void {
+    this.emit("error", {});
+  }
+
   /** The request frame the transport wrote, parsed. */
   get request(): { requestId: string; operation: string; body: unknown; [key: string]: unknown } {
     return JSON.parse(this.sent[0] ?? "{}") as never;
@@ -251,6 +255,101 @@ describe("the terminal watch", () => {
     stop();
     socket.deliver({ kind: "event", requestId: id, body: { chunk: "after-stop" } });
     expect(frames).toEqual([{ chunk: "one" }, { chunk: "two" }]);
+  });
+});
+
+describe("the Mini App agent turn watch", () => {
+  it.each(["close", "error"] as const)("settles as unknown when the socket %s without a final frame", async (event) => {
+    const transport = transportWith(ControllableSocket);
+    const frames: unknown[] = [];
+    const failures: Error[] = [];
+    transport.watchMiniAppAgentTurn(
+      {
+        pluginId: "fixture.miniapp",
+        hostSessionId: "host-session",
+        connection: 1,
+        requestId: "turn-1",
+        method: "run",
+        text: "hello",
+        observe: true,
+      },
+      (frame) => frames.push(frame),
+      (error) => failures.push(error),
+    );
+    await tick();
+    const socket = ControllableSocket.latest!;
+    if (event === "close") socket.close();
+    else socket.fail();
+    expect(frames).toEqual([]);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ code: "result_unknown" });
+  });
+});
+
+describe("the Mini App presentation lease watch", () => {
+  it("reacquires the lease after an unexpected transport close", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = transportWith(ControllableSocket);
+      const failures: Error[] = [];
+      const stop = transport.watchMiniAppPresentation(
+        { pluginId: "fixture.miniapp", sessionId: "session-1" },
+        () => undefined,
+        (error) => failures.push(error),
+      );
+      await tick();
+      const first = ControllableSocket.latest!;
+      expect(first.request.operation).toBe("watchMiniAppPresentation");
+      first.close();
+      expect(failures).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(250);
+      await tick();
+      const replacement = ControllableSocket.latest!;
+      expect(replacement).not.toBe(first);
+      expect(replacement.request.operation).toBe("watchMiniAppPresentation");
+      expect(replacement.request.body).toEqual({ pluginId: "fixture.miniapp", sessionId: "session-1" });
+
+      stop();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(ControllableSocket.latest).toBe(replacement);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off repeated short-lived lease reconnects", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = transportWith(ControllableSocket);
+      const failures: Error[] = [];
+      const stop = transport.watchMiniAppPresentation(
+        { pluginId: "fixture.miniapp", sessionId: "session-1" },
+        () => undefined,
+        (error) => failures.push(error),
+      );
+      await tick();
+      const first = ControllableSocket.latest!;
+      first.fail();
+      expect(failures).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(250);
+      await tick();
+      const second = ControllableSocket.latest!;
+      expect(second).not.toBe(first);
+      second.fail();
+      expect(failures).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(499);
+      expect(ControllableSocket.latest).toBe(second);
+      await vi.advanceTimersByTimeAsync(1);
+      await tick();
+      expect(ControllableSocket.latest).not.toBe(second);
+
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

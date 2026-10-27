@@ -238,6 +238,7 @@ const ACCOUNT_KEYS = [
 const SHELL_KEYS = ["watchEvents"] as const satisfies readonly (keyof ShellEventPort)[];
 
 const MINIAPP_KEYS = [
+  "watchMiniAppPresenter",
   "listMiniApps",
   "openMiniApp",
   "stopMiniApp",

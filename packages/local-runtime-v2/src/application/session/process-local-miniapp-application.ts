@@ -2,6 +2,8 @@ import type { MiniAppSurfaceSummary } from '@mavis/shared/miniapp-surface';
 
 import {
   miniAppBusyReason,
+  deriveMiniAppNodePort,
+  probeMiniAppPortOwnership,
   type MiniAppStatus,
   type MiniAppSupervisor,
 } from '../../service/miniapp/index.js';
@@ -19,7 +21,7 @@ type ProcessLocalMiniAppApplication = NonNullable<LocalRuntimeApplication['miniA
 /** Projects installed MiniApp definitions and Supervisor state for the Electron bridge. */
 export function createProcessLocalMiniAppApplication(
   plugins: MiniAppPluginControl,
-  supervisor: Pick<MiniAppSupervisor, 'inspect' | 'launchCredential'> | undefined,
+  supervisor: Pick<MiniAppSupervisor, 'inspect' | 'launchCredential' | 'ownerClient'> | undefined,
 ): ProcessLocalMiniAppApplication | undefined {
   if (!supervisor) return undefined;
 
@@ -74,20 +76,48 @@ export function createProcessLocalMiniAppApplication(
     return launch(miniApp, supervisor.inspect(pluginId)[0]);
   };
 
+  const listRows = async (
+    definitions: readonly AvailableMiniAppDefinition[],
+    statuses: ReadonlyMap<string, MiniAppStatus>,
+  ): Promise<readonly MiniAppSurfaceSummary[]> =>
+    Promise.all(
+      definitions.map(async (miniApp) => {
+        const status = statuses.get(miniApp.pluginId);
+        if (status?.phase === 'active' || status?.phase === 'starting' || status?.phase === 'preparing') {
+          return summary(miniApp, status);
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 500);
+        timer.unref();
+        try {
+          const ownership = await probeMiniAppPortOwnership({
+            port: deriveMiniAppNodePort(miniApp.pluginId),
+            timeoutMs: 500,
+            signal: controller.signal,
+          });
+          const ownedElsewhere = ownership === 'guarded';
+          const ownerClient = ownedElsewhere && supervisor.ownerClient
+            ? await supervisor.ownerClient(miniApp.pluginId).catch(() => undefined)
+            : undefined;
+          return summary(miniApp, status, ownedElsewhere, ownerClient);
+        } catch {
+          return summary(miniApp, status);
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    );
+
   return {
     list: async () => {
       const definitions = await plugins.listAvailableMiniApps();
       const statuses = new Map(supervisor.inspect().map((status) => [status.pluginId, status]));
-      return {
-        miniApps: definitions.map((miniApp) => summary(miniApp, statuses.get(miniApp.pluginId))),
-      };
+      return { miniApps: await listRows(definitions, statuses) };
     },
     listInstalled: async () => {
       const definitions = await plugins.listInstalledMiniApps();
       const statuses = new Map(supervisor.inspect().map((status) => [status.pluginId, status]));
-      return {
-        miniApps: definitions.map((miniApp) => summary(miniApp, statuses.get(miniApp.pluginId))),
-      };
+      return { miniApps: await listRows(definitions, statuses) };
     },
     open: ({ pluginId, signal }) => open(pluginId, signal),
     stop: async ({ pluginId, signal }) => {
@@ -100,6 +130,8 @@ export function createProcessLocalMiniAppApplication(
 function summary(
   miniApp: AvailableMiniAppDefinition,
   status: MiniAppStatus | undefined,
+  ownedElsewhere = false,
+  ownerClient?: string,
 ): MiniAppSurfaceSummary {
   const runtimeStatus = mapRuntimeStatus(status?.phase);
   return {
@@ -113,6 +145,12 @@ function summary(
       status: runtimeStatus,
       ...(runtimeStatus === 'failed' && status?.failureCode
         ? { errorCode: status.failureCode }
+        : {}),
+      ...(ownedElsewhere
+        ? {
+            ownership: 'other-client' as const,
+            ...(ownerClient ? { ownerClient } : {}),
+          }
         : {}),
     },
   };

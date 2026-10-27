@@ -82,6 +82,42 @@ function render(element: ReactElement, workflows: ReturnType<typeof createWebuiM
 }
 
 describe("the plugin catalogue's apps area", () => {
+  it("shows an opening state while the runtime starts a Mini App", async () => {
+    let finishOpen!: (value: { pluginId: string; viewUrl: string }) => void;
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({
+        miniApps: [summary("dashboard", "stopped")],
+        open: () => new Promise((resolve) => {
+          finishOpen = resolve;
+        }),
+      }),
+    });
+
+    const opening = workflows.open("dashboard");
+    expect(workflows.getSnapshot().presentations.dashboard).toEqual({ kind: "opening" });
+
+    finishOpen({ pluginId: "dashboard", viewUrl: "http://127.0.0.1:49152" });
+    await opening;
+    expect(workflows.getSnapshot().presentations.dashboard).toMatchObject({ kind: "open" });
+  });
+
+  it("clears a capacity refusal after another Mini App is stopped", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        listMiniApps: async () => ({ miniApps: [summary("dashboard", "running")] }),
+        openMiniApp: async () => {
+          throw Object.assign(new Error("capacity reached"), { code: "BUSY" });
+        },
+        stopMiniApp: async () => ({ success: true as const }),
+      },
+    });
+
+    await workflows.open("fourth");
+    expect(workflows.getSnapshot().refusals.fourth?.code).toBe("BUSY");
+    await workflows.stop("dashboard");
+    expect(workflows.getSnapshot().refusals.fourth).toBeUndefined();
+  });
+
   it("lists the runtime's state and offers the lifecycle actions", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: port({
@@ -122,6 +158,30 @@ describe("the plugin catalogue's apps area", () => {
     expect(markup).toContain("已在其他客户端运行");
   });
 
+  it("shows confirmed cross-client ownership before open and disables both launch actions", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({
+        miniApps: [summary("shared", "stopped", { ownership: "other-client", ownerClient: "electron" })],
+      }),
+    });
+    await workflows.loadListing();
+
+    const apps = render(createElement(MiniAppAppsList, {}), workflows);
+    const picker = render(
+      createElement(MiniAppPicker, {
+        sessionId: "session-1",
+        onOpened: () => undefined,
+        onClose: () => undefined,
+      }),
+      workflows,
+    );
+
+    expect(apps).toContain("其他客户端运行中");
+    expect(apps).toContain("electron");
+    expect(apps).toContain('data-testid="miniapp-app-open-shared" disabled=""');
+    expect(picker).toContain('data-testid="miniapp-picker-open-shared" disabled=""');
+  });
+
   it("offers 启用 for a disabled Mini App instead of a start it cannot do", async () => {
     const workflows = createWebuiMiniAppWorkflows({
       port: port({
@@ -141,6 +201,27 @@ describe("the plugin catalogue's apps area", () => {
     // The enabled row keeps its start and stop actions.
     expect(markup).toContain("enabled-one 应用");
     expect(markup).toContain("打开");
+  });
+
+  it("offers standalone viewing only when the WebUI deep link has a selected session", async () => {
+    const workflows = createWebuiMiniAppWorkflows({
+      port: port({
+        miniApps: [summary("dashboard", "stopped")],
+        standaloneUrl: ({ pluginId, sessionId }) =>
+          `http://127.0.0.1:4173/?plugin=${pluginId}&session=${sessionId}`,
+      }),
+    });
+    await workflows.open("dashboard");
+
+    const withoutSession = render(createElement(MiniAppAppsList, {}), workflows);
+    expect(withoutSession).not.toContain('aria-label="查看"');
+
+    const withSession = render(
+      createElement(MiniAppAppsList, { selectedSessionId: "session-1" }),
+      workflows,
+    );
+    expect(withSession).toContain("查看");
+    expect(withSession).toMatch(/<button type="button" aria-label="查看" title="[^"]+">查看<\/button>/);
   });
 
   it("says the capability is absent rather than showing an empty list", () => {
@@ -412,6 +493,7 @@ describe("the proxy registry", () => {
       target: {
         pluginId: "registry.case",
         upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+        surfacePath: "/",
         credential: "credential-value",
         credentialHeader: "x-mavis-miniapp-token",
       },
@@ -596,5 +678,86 @@ describe("a detached view whose standalone tab goes away", () => {
     // Stopped by the person: the loop must not bring it back.
     expect(await stopped.presentInline(PLUGIN)).toBe("blocked");
     expect(stopped.getSnapshot().presentations[PLUGIN]?.kind).toBe("stopped");
+  });
+
+  it("refreshes an open connection generation when an inline view is mounted again", async () => {
+    let connection = 0;
+    let opens = 0;
+    let detached = false;
+    let presentationRevision = 0;
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        listMiniApps: async () => ({
+          miniApps: [summary(PLUGIN, "running", {}, { detached, presentationRevision })],
+        }),
+        openMiniApp: async ({ pluginId }) => {
+          opens += 1;
+          connection += 1;
+          return { pluginId, viewUrl: "http://127.0.0.1:49152", connection };
+        },
+        stopMiniApp: async () => ({ success: true as const }),
+      },
+    });
+
+    expect(await workflows.open(PLUGIN)).toBe(true);
+    expect(workflows.getSnapshot().presentations[PLUGIN]).toMatchObject({ connection: 1 });
+
+    // Another document replaces the service connection while holding its lease.
+    detached = true;
+    presentationRevision = 1;
+    await workflows.loadListing();
+    await workflows.refreshInline(PLUGIN);
+    expect(opens).toBe(1);
+
+    // When that lease ends, the mounted inline view sees the revision change and
+    // reacquires the connection instead of sending bridge calls through the old id.
+    detached = false;
+    await workflows.loadListing();
+    await workflows.refreshInline(PLUGIN);
+    expect(workflows.getSnapshot().presentations[PLUGIN]).toMatchObject({ connection: 2 });
+    expect(opens).toBe(2);
+  });
+
+  it("waits through a standalone lease reconnect before reopening the inline view", async () => {
+    let connection = 0;
+    let opens = 0;
+    let detached = false;
+    let presentationRevision = 0;
+    let reconnectionInProgress = false;
+    let confirmationReads = 0;
+    const workflows = createWebuiMiniAppWorkflows({
+      port: {
+        listMiniApps: async () => {
+          if (reconnectionInProgress) {
+            confirmationReads += 1;
+            if (confirmationReads > 1) {
+              detached = true;
+              presentationRevision += 1;
+            }
+          }
+          return {
+            miniApps: [summary(PLUGIN, "running", {}, { detached, presentationRevision })],
+          };
+        },
+        openMiniApp: async ({ pluginId }) => {
+          opens += 1;
+          connection += 1;
+          return { pluginId, viewUrl: "http://127.0.0.1:49152", connection };
+        },
+        stopMiniApp: async () => ({ success: true as const }),
+      },
+    });
+
+    expect(await workflows.open(PLUGIN)).toBe(true);
+    detached = false;
+    presentationRevision = 1;
+    await workflows.loadListing();
+    reconnectionInProgress = true;
+
+    await workflows.refreshInline(PLUGIN);
+
+    expect(confirmationReads).toBe(2);
+    expect(opens).toBe(1);
+    expect(workflows.getSnapshot().presentations[PLUGIN]).toMatchObject({ connection: 1 });
   });
 });

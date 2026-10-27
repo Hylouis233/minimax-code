@@ -29,6 +29,7 @@ import {
   openMiniAppOperation,
   stopMiniAppOperation,
   watchMiniAppPresentationOperation,
+  watchMiniAppPresenterOperation,
 } from "../../src/server/operation/miniapp.js";
 import { createOperationRegistry } from "../../src/server/operation/operations.js";
 import type { WebuiOperationRegistryEntry } from "../../src/server/operation/operation-contract.js";
@@ -40,7 +41,9 @@ import {
   type StartMiniAppProxyInput,
 } from "../../src/server/miniapp/proxy.js";
 import { WebuiErrorCode } from "../../src/shared/envelope.js";
+import { createMiniAppPresenter } from "../../src/server/miniapp/presenter.js";
 import type {
+  WebuiMiniAppPresentationIntent,
   WebuiMiniAppPresentationState,
   WebuiMiniAppSummary,
 } from "../../src/shared/contracts/miniapp.js";
@@ -362,7 +365,7 @@ describe("openMiniApp over a real loopback proxy", () => {
 
       expect(body).toEqual({
         pluginId: VIEW_PLUGIN,
-        viewUrl: `http://127.0.0.1:${proxyPort}`,
+        viewUrl: `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
         // The generation this start issued: what a page-bridge call must echo to
         // prove it is still the document being served.
         connection: 1,
@@ -375,7 +378,7 @@ describe("openMiniApp over a real loopback proxy", () => {
       const serialised = JSON.stringify(body);
       expect(serialised).not.toContain(CREDENTIAL);
       expect(serialised).not.toContain(MINIAPP_LOOPBACK_TOKEN_HEADER);
-      expect(serialised).not.toContain(SURFACE_PATH);
+      expect(serialised).toContain(SURFACE_PATH);
       expect(serialised).not.toContain(upstreamOrigin);
 
       // The URL is not decorative: it serves the page, and the credential the
@@ -384,6 +387,7 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(starter.records[0]?.target).toEqual({
         pluginId: VIEW_PLUGIN,
         upstreamOrigin,
+        surfacePath: SURFACE_PATH,
         credential: CREDENTIAL,
         credentialHeader: MINIAPP_LOOPBACK_TOKEN_HEADER,
       });
@@ -427,7 +431,7 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(firstShape).toEqual(secondShape);
       expect(secondConnection).toBe(firstConnection + 1);
       expect((second as { readonly viewUrl: string }).viewUrl).toBe(
-        `http://127.0.0.1:${proxyPort}`,
+        `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
       );
 
       // The live listener is the replacement: it injects the credential the second
@@ -495,7 +499,7 @@ describe("stopMiniApp", () => {
     try {
       const opened = await handle("openMiniApp", { pluginId: STOP_PLUGIN });
       expect((opened as { readonly viewUrl: string }).viewUrl).toBe(
-        `http://127.0.0.1:${proxyPort}`,
+        `http://127.0.0.1:${proxyPort}${SURFACE_PATH}`,
       );
       expect((await get(`http://127.0.0.1:${proxyPort}/`)).status).toBe(200);
 
@@ -771,26 +775,66 @@ describe("watchMiniAppPresentation", () => {
     await lease.frames.next().catch(() => undefined);
   });
 
-  it("fails on a lookup that is not a confirmed absence, and takes no lease", async () => {
+  it("keeps the presentation lease when session lookup cannot confirm a live or ended session", async () => {
     const { port, calls } = createFacade();
     const { handle, openLease } = createLeaseHarness(port);
     calls.setSession(SESSION, "broken");
+    const controller = new AbortController();
 
-    const failure = await openLease({
-      pluginId: LEASE_PLUGIN,
-      sessionId: SESSION,
-    }).catch((error: unknown) => error);
+    const lease = await openLease(
+      { pluginId: LEASE_PLUGIN, sessionId: SESSION },
+      controller.signal,
+    );
+    const frame = await lease.frames.next();
 
-    // The failure surfaces: an unreachable runtime is not an ended session, and
-    // nothing may report the person's session as gone because of it.
-    expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toBe("harness unavailable");
+    // Lookup is observational: keep the app presentation alive without claiming
+    // the session ended. The lease prevents another document opening a duplicate.
+    expect(frame.value).toMatchObject({ session: "unresolved", presentationRevision: 1 });
     const listed = (await handle("listMiniApps", undefined)) as {
       miniApps: ReadonlyArray<{ pluginId: string; detached: boolean; presentationRevision: number }>;
     };
-    expect(listed.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN)).toMatchObject({
-      detached: false,
-      presentationRevision: 0,
+    expect(
+      listed.miniApps.find((candidate) => candidate.pluginId === LEASE_PLUGIN),
+    ).toMatchObject({ detached: true, presentationRevision: 1 });
+    controller.abort();
+    await lease.frames.next().catch(() => undefined);
+  });
+});
+
+describe("watchMiniAppPresenter", () => {
+  it("replays the active request and streams later close events until disconnected", async () => {
+    const presenter = createMiniAppPresenter({});
+    await presenter.presenter.open({ sessionId: "session-presenter", pluginId: "agent.app" });
+    const entries = createMiniAppHandlerEntries({} as WebuiOperationPort, { presenter });
+    const entry = entries.get(watchMiniAppPresenterOperation.name);
+    if (!entry) throw new Error("watchMiniAppPresenter is not registered");
+    const controller = new AbortController();
+    const result = await entry.handle({ requestId: "presenter", signal: controller.signal }, undefined);
+    if (!("stream" in result) || !result.stream.ok) throw new Error("expected a presenter stream");
+    const frames = (result.stream.source as AsyncIterable<WebuiMiniAppPresentationIntent>)[Symbol.asyncIterator]();
+
+    expect(await frames.next()).toEqual({
+      done: false,
+      value: {
+        epoch: expect.any(String),
+        revision: 1,
+        action: "open",
+        sessionId: "session-presenter",
+        pluginId: "agent.app",
+      },
     });
+    await presenter.presenter.close({ pluginId: "agent.app" });
+    expect(await frames.next()).toEqual({
+      done: false,
+      value: {
+        epoch: (presenter.snapshot() as WebuiMiniAppPresentationIntent).epoch,
+        revision: 2,
+        action: "close",
+        sessionId: "session-presenter",
+        pluginId: "agent.app",
+      },
+    });
+    controller.abort();
+    expect(await frames.next()).toMatchObject({ done: true });
   });
 });

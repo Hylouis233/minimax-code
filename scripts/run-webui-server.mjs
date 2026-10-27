@@ -111,7 +111,7 @@ const port = createHarnessPortFromHost(assembled.host, {
   await browser.initialize();
   const service = new WebuiService({
     port,
-    operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies),
+    operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies, miniAppPresenter),
     terminal,
     tcpPort,
     dev: true,

@@ -48,6 +48,7 @@ import type {
   WebuiMiniAppAgentTurnFrame,
   WebuiMiniAppAgentTurnRequest,
 } from "../../src/shared/contracts/miniapp-agent.js";
+import { WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST } from "../../src/shared/contracts/miniapp-agent.js";
 import type { WebuiMiniAppPortSlice } from "../../src/client/features/miniapp/application/miniapp-workflows.js";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
 
@@ -151,6 +152,7 @@ function turnResult(overrides: Partial<MiniAppAgentRunResult> = {}): MiniAppAgen
 interface Harness {
   readonly page: PageHarness;
   readonly host: WebuiMiniAppAgentBridgeHost;
+  readonly hostFrames: Record<string, unknown>[];
   readonly calls: WebuiMiniAppAgentCallRequest[];
   readonly turns: WebuiMiniAppAgentTurnRequest[];
 }
@@ -166,6 +168,7 @@ function bridgeHarness(
   } = {},
 ): Harness {
   const page = openPage();
+  const hostFrames: Record<string, unknown>[] = [];
   const calls: WebuiMiniAppAgentCallRequest[] = [];
   const turns: WebuiMiniAppAgentTurnRequest[] = [];
   const host = createWebuiMiniAppAgentBridge({
@@ -173,7 +176,10 @@ function bridgeHarness(
     hostSessionId: HOST_SESSION,
     connection: 1,
     viewUrl: VIEW_URL,
-    post: (message) => page.deliver(message),
+    post: (message) => {
+      hostFrames.push(message as Record<string, unknown>);
+      page.deliver(message);
+    },
     commands: {
       call: async (request) => {
         calls.push(request);
@@ -192,7 +198,7 @@ function bridgeHarness(
       },
     },
   });
-  return { page, host, calls, turns };
+  return { page, host, hostFrames, calls, turns };
 }
 
 function agentPort(overrides: Partial<Record<string, unknown>> = {}): WebuiHarnessPort {
@@ -309,6 +315,59 @@ describe("the page bridge's agent block", () => {
     expect(harness.turns).toHaveLength(1);
     expect(harness.host.inFlight()).toEqual(["same"]);
     first.catch(() => undefined);
+  });
+
+  it("answers an unknown page method instead of leaving its promise pending", async () => {
+    const { page, host, hostFrames } = bridgeHarness();
+    host.handleMessage(
+      {
+        data: {
+          type: WEBUI_MINIAPP_BRIDGE_AGENT_REQUEST,
+          requestId: "future-method-1",
+          method: "futureMethod",
+          payload: {},
+          observe: false,
+        },
+        origin: ORIGIN,
+        source: page.window,
+      },
+      page.window,
+    );
+
+    expect(hostFrames).toContainEqual({
+      type: "mcode:miniapp:agent-result",
+      requestId: "future-method-1",
+      result: { ok: false, code: "invalid_request" },
+    });
+  });
+
+  it("refuses a short call that reuses an in-flight turn request id", async () => {
+    const harness = bridgeHarness();
+    const running = harness.page.agent.run({ text: "one", requestId: "shared" });
+    deliver(harness.page, harness.host);
+
+    harness.host.handleMessage(
+      {
+        data: {
+          type: "mcode:miniapp:agent-request",
+          requestId: "shared",
+          method: "models",
+          payload: {},
+          observe: false,
+        },
+        origin: ORIGIN,
+        source: harness.page.window,
+      },
+      harness.page.window,
+    );
+
+    expect(harness.calls).toHaveLength(0);
+    expect(harness.hostFrames.at(-1)).toMatchObject({
+      type: "mcode:miniapp:agent-result",
+      requestId: "shared",
+      result: { ok: false, code: "busy" },
+    });
+    running.catch(() => undefined);
   });
 
   it("cancels a live turn through the service when the page asks", async () => {
@@ -677,6 +736,10 @@ describe("the shown presentation", () => {
     await settle();
     expect(calls.map((call) => call.method)).toEqual(["panelOpened", "panelClosed"]);
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
+    // The workspace tab unmount follows the rail change. It must not erase the
+    // resting record that lets the same session become answerable on return.
+    workflows.releaseShown(PLUGIN);
+    expect(workflows.getSnapshot().agentResting?.sessionId).toBe(MINI_SESSION);
 
     // Coming back is the rail's own path too: the page is not asked again, the
     // business reports the session it remembered — without which the runtime would
@@ -834,6 +897,40 @@ describe("the shown presentation", () => {
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
     // The page still wants it, so returning is still a claim.
     expect(workflows.getSnapshot().agentResting?.sessionId).toBe(MINI_SESSION);
+  });
+
+  it("closes an initial shown report that finishes after the view unmounts", async () => {
+    const { store, selection } = selectedStore();
+    const calls: WebuiMiniAppAgentCallRequest[] = [];
+    let release: (() => void) | undefined;
+    const port = {
+      ...portWith(calls),
+      miniAppAgentCall: async (request: WebuiMiniAppAgentCallRequest) => {
+        calls.push(request);
+        if (request.method === "panelOpened") {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return { ok: true as const, method: request.method as "panelOpened" | "panelClosed" };
+      },
+    } as WebuiMiniAppPortSlice;
+    const workflows = createWebuiMiniAppWorkflows({ port, selection });
+    store.select(MINI_SESSION);
+
+    const reporting = workflows.reportShown({
+      pluginId: PLUGIN,
+      sessionId: MINI_SESSION,
+      hostSessionId: HOST_SESSION,
+      connection: 1,
+    });
+    await settle();
+    workflows.releaseShown(PLUGIN);
+    release?.();
+    await reporting;
+
+    expect(calls.map((call) => call.method)).toEqual(["panelOpened", "panelClosed"]);
+    expect(workflows.getSnapshot().agentShown).toBeUndefined();
   });
 
   it("keeps the panels it must close when the stop itself fails", async () => {

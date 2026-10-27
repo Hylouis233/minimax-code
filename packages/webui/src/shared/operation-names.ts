@@ -176,6 +176,7 @@ export const LIST_MINI_APPS_OPERATION_NAME = "listMiniApps" as const;
 export const OPEN_MINI_APP_OPERATION_NAME = "openMiniApp" as const;
 export const STOP_MINI_APP_OPERATION_NAME = "stopMiniApp" as const;
 export const WATCH_MINI_APP_PRESENTATION_OPERATION_NAME = "watchMiniAppPresentation" as const;
+export const WATCH_MINI_APP_PRESENTER_OPERATION_NAME = "watchMiniAppPresenter" as const;
 /**
  * One followed Mini App turn (`run` / `answer`).
  *
@@ -330,6 +331,7 @@ import type {
 import type { WebuiPluginManagementRequest } from "./plugin-management.js";
 import type {
   WebuiMiniAppCatalogue,
+  WebuiMiniAppPresentationIntent,
   WebuiMiniAppPresentationState,
   WebuiMiniAppView,
 } from "./contracts/miniapp.js";
@@ -537,6 +539,10 @@ export interface OperationSpec {
   watchBrowserWebTabs: {
     request: { readonly surface: WebuiBrowserSurface; readonly runId?: string };
     response: WebuiBrowserWebTabStreamEnvelope;
+  };
+  watchMiniAppPresenter: {
+    request: undefined;
+    response: WebuiMiniAppPresenterStreamEnvelope;
   };
   /**
    * A url, and optionally the run the page is opened for. There is no surface:
@@ -873,6 +879,7 @@ export const WEBUI_STREAM_OPERATION_NAMES = [
   WATCH_BROWSER_FRAMES_OPERATION_NAME,
   WATCH_BROWSER_WEB_TABS_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
   WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
 ] as const;
 
@@ -913,6 +920,14 @@ export interface WebuiBrowserWebTabStreamEnvelope {
   readonly stream: {
     readonly ok: true;
     readonly source: AsyncIterable<WebuiBrowserWebTabSnapshot>;
+  };
+}
+
+/** The client presentation intent stream from the runtime-owned presenter. */
+export interface WebuiMiniAppPresenterStreamEnvelope {
+  readonly stream: {
+    readonly ok: true;
+    readonly source: AsyncIterable<WebuiMiniAppPresentationIntent>;
   };
 }
 

@@ -25,6 +25,10 @@ export interface MiniAppSurfaceSummary {
     readonly kind: 'process';
     readonly status: MiniAppRuntimeStatus;
     readonly errorCode?: string;
+    /** The process guard proves this plugin is running in another client. */
+    readonly ownership?: 'other-client';
+    /** Label recorded by that live process owner; omitted when its record is unreadable. */
+    readonly ownerClient?: string;
   };
 }
 

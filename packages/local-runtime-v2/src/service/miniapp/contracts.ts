@@ -139,6 +139,8 @@ export interface MiniAppNodeRuntime {
 }
 
 export interface MiniAppNodeRuntimeFactory {
+  /** Reads the renderer-safe owner label after the process guard proves another client is live. */
+  ownerClient?(pluginId: string): Promise<string | undefined>;
   prepare(input: {
     readonly candidate: ProcessMiniAppCandidate;
     readonly processGeneration: string;
@@ -268,6 +270,8 @@ export interface MiniAppSupervisor extends MiniAppPublicationCoordinator {
     readonly expectedProcessGeneration?: string;
   }): Promise<MiniAppGenerationLease>;
   inspect(pluginId?: string): readonly MiniAppStatus[];
+  /** The label recorded by a live external Mini App owner, when readable. */
+  ownerClient?(pluginId: string): Promise<string | undefined>;
   /**
    * Server-only: the live generation's loopback credential, so the proxy that injects it has something
    * to inject. Never part of a published view and never forwarded to a renderer.

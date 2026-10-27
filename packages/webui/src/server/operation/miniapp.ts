@@ -1,7 +1,7 @@
 // The Mini App surface: the catalogue, the launch, the stop, and the standalone
 // presentation lease.
 //
-// Four descriptors over one runtime capability. The first three are dedicated
+// Five descriptors over one runtime capability. The first three are dedicated
 // handlers rather than bindings (`handlers/miniapp.ts`), because two of them do
 // more than forward one call: `openMiniApp` turns the runtime's launch
 // coordinates into a loopback proxy and answers with that proxy's URL, and
@@ -9,9 +9,8 @@
 // them keeps the capability's declarations in one place — a host either has Mini
 // Apps or it does not.
 //
-// `watchMiniAppPresentation` is the fourth and is a stream: ADR 0020's lease
-// lives as long as the standalone document's connection, so the operation's
-// value is its lifetime rather than its frame.
+// `watchMiniAppPresentation` holds the standalone document's lease, and
+// `watchMiniAppPresenter` carries agent-driven show/close requests to the client.
 import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppView,
@@ -22,6 +21,7 @@ import {
   OPEN_MINI_APP_OPERATION_NAME,
   STOP_MINI_APP_OPERATION_NAME,
   WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import type {
   WebuiOperation,
@@ -146,4 +146,17 @@ export const watchMiniAppPresentationOperation: WebuiOperation<{
       };
     return { ok: true, body: { pluginId: plugin.body.pluginId, sessionId: sessionId.trim() } };
   },
+};
+
+/** Streams the runtime host's presentation state to the browser client. */
+export const watchMiniAppPresenterOperation: WebuiOperation<undefined> = {
+  name: WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
+  validate: (body) =>
+    body === undefined
+      ? { ok: true, body: undefined }
+      : {
+          ok: false,
+          code: WebuiErrorCode.invalidBody,
+          message: `${WATCH_MINI_APP_PRESENTER_OPERATION_NAME} does not accept a body`,
+        },
 };

@@ -13,6 +13,8 @@ export interface InitializeMiniAppSupervisorOptions {
   readonly connectorGateway: HostProcessConnectorGateway;
   /** The runtime's Agent gateway; the child IPC connector registers its arena against it. */
   readonly agentGateway?: MiniAppAgentGateway;
+  /** Stable runtime-owner label shown when another client already owns a Mini App. */
+  readonly ownerClient?: string;
   readonly verifyCandidate: (candidate: MiniAppCandidate) => Promise<boolean>;
   readonly materializePackage: (input: {
     readonly sourceRoot: string;
@@ -33,6 +35,7 @@ export function initializeMiniAppSupervisor(
   const ports = new HostMiniAppPortRegistry(options.productReservedPorts);
   const nodeRuntime = createMiniAppNodeRuntimeAdapter({
     resolvePluginDataDir: options.resolvePluginDataDir,
+    ...(options.ownerClient ? { ownerClient: options.ownerClient } : {}),
     verifyCandidate: options.verifyCandidate,
     materializePackage: options.materializePackage,
     isPortReserved: (input) => ports.isReserved(input),

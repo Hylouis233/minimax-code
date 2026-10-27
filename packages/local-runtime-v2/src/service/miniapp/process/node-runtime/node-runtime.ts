@@ -21,7 +21,11 @@ import { sanitizeMiniAppRuntimeLogEvent } from '../../runtime-log.js';
 import type { MiniAppRunnerInitMessage } from './host-runner.js';
 import { waitForLoopbackReadiness } from './loopback-readiness.js';
 import { probeMiniAppPortOwnership } from './loopback-ownership.js';
-import { acquireMiniAppOwner, type MiniAppOwnerIdentity } from './owner-lease.js';
+import {
+  acquireMiniAppOwner,
+  readMiniAppOwnerIdentity,
+  type MiniAppOwnerIdentity,
+} from './owner-lease.js';
 import {
   createDirectNodeRootTerminator,
   type DirectNodeRootTerminator,
@@ -152,6 +156,10 @@ export function createMiniAppNodeRuntimeAdapter(
   const resolved = resolveOptions(options);
   const physicalRoots = createPhysicalRootCapacity(MAX_RUNNING_PLUGIN_SERVICES);
   return {
+    async ownerClient(pluginId) {
+      const dataDir = await resolveDataDir(resolved, pluginId);
+      return (await readMiniAppOwnerIdentity(dataDir))?.client;
+    },
     async prepare(input) {
       assertCapabilities(resolved, input.candidate);
       throwIfAborted(input.signal);
@@ -266,11 +274,12 @@ async function preparedRuntimeWithOwnership(
 ): Promise<MiniAppNodeRuntime> {
   // One credential per process generation: every port attempt reuses it.
   const loopbackToken = input.options.makeLoopbackToken();
-  const derivedPort = deterministicPort(input);
+  const ownershipPort = deriveMiniAppNodePort(input.candidate.pluginId);
   const firstCandidatePort = candidatePort(input, 0);
-  if (firstCandidatePort === derivedPort) {
-    await refuseIfPortIsOwnedElsewhere(input, derivedPort);
-  }
+  // Probe the plugin's stable port before applying Host reservation policy. A
+  // reservation may skip that candidate, but it cannot make an existing owner
+  // safe to run beside on a fallback port.
+  await refuseIfPortIsOwnedElsewhere(input, ownershipPort);
   let lastError: unknown;
   for (let index = 0; index < input.options.maxPortAttempts; index += 1) {
     const port = index === 0 ? firstCandidatePort : candidatePort(input, index);
@@ -319,7 +328,7 @@ async function preparedRuntimeWithOwnership(
       if (!retryablePortError(failure)) throw failure;
       // Only this plugin's deterministic port identifies its cross-client owner. A guarded
       // listener on any fallback candidate can belong to a different Mini App.
-      if (port === derivedPort) await refuseIfPortIsOwnedElsewhere(input, port);
+      if (port === ownershipPort) await refuseIfPortIsOwnedElsewhere(input, port);
       if (index + 1 >= input.options.maxPortAttempts) throw failure;
     }
   }
@@ -911,11 +920,15 @@ function candidatePort(input: Parameters<typeof prepareRuntime>[0], index: numbe
   throw new MiniAppNodeRuntimeError('NO_CANDIDATE_PORT', 'No Host-approved port is available');
 }
 
+export function deriveMiniAppNodePort(pluginId: string): number {
+  const digest = createHash('sha256').update(pluginId).digest();
+  return PORT_MIN + (digest.readUInt32BE(0) % PORT_COUNT);
+}
+
 function deterministicPort(input: Parameters<typeof prepareRuntime>[0]): number {
   const preferred = input.preferredPort;
   if (preferred !== undefined && preferred >= PORT_MIN && preferred <= PORT_MAX) return preferred;
-  const digest = createHash('sha256').update(input.candidate.pluginId).digest();
-  return PORT_MIN + (digest.readUInt32BE(0) % PORT_COUNT);
+  return deriveMiniAppNodePort(input.candidate.pluginId);
 }
 
 function runnerEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

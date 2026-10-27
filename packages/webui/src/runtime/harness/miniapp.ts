@@ -94,6 +94,12 @@ export function toWebuiMiniAppSummary(
       ...(summary.runtime.errorCode !== undefined
         ? { errorCode: summary.runtime.errorCode }
         : {}),
+      ...(summary.runtime.ownership !== undefined
+        ? { ownership: summary.runtime.ownership }
+        : {}),
+      ...(summary.runtime.ownerClient !== undefined
+        ? { ownerClient: summary.runtime.ownerClient }
+        : {}),
     },
   };
 }

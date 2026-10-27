@@ -8,7 +8,10 @@ import type { ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { MiniAppNodeRuntime, ProcessMiniAppCandidate } from '../../../src/service/miniapp/contracts.js';
-import { createMiniAppNodeRuntimeAdapter } from '../../../src/service/miniapp/process/node-runtime/node-runtime.js';
+import {
+  createMiniAppNodeRuntimeAdapter,
+  deriveMiniAppNodePort,
+} from '../../../src/service/miniapp/process/node-runtime/node-runtime.js';
 import {
   startMiniAppModule,
   type MiniAppRunnerInitMessage,
@@ -109,8 +112,8 @@ class ScriptedChild extends EventEmitter {
 
 let packageRoot = '';
 
-const candidate = (): ProcessMiniAppCandidate => ({
-  pluginId: 'fixture.miniapp',
+const candidate = (pluginId = 'fixture.miniapp'): ProcessMiniAppCandidate => ({
+  pluginId,
   packageRoot,
   packageDigest: 'package-digest',
   clientDigest: 'client-digest',
@@ -268,7 +271,7 @@ describe('Mini App ownership before spawn', () => {
         adapter.prepare({
           candidate: candidate(),
           processGeneration: 'generation-bind-race',
-          preferredPort: 56_000,
+          preferredPort: deriveMiniAppNodePort(candidate().pluginId),
           signal: new AbortController().signal,
           onLog: () => undefined,
         }),
@@ -287,7 +290,10 @@ describe('Mini App ownership before spawn', () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'miniapp external owner '));
     let guardedServer: Server | undefined;
     let guardedPort: number | undefined;
-    for (let port = 55_000; port < 56_000 && guardedServer === undefined; port += 1) {
+    let ownerPluginId: string | undefined;
+    for (let attempt = 0; attempt < 100 && guardedServer === undefined; attempt += 1) {
+      const candidateId = `fixture.external-owner-${attempt}`;
+      const port = deriveMiniAppNodePort(candidateId);
       const server = createServer((_request, response) => {
         response.writeHead(401).end();
       });
@@ -298,11 +304,13 @@ describe('Mini App ownership before spawn', () => {
         });
         guardedServer = server;
         guardedPort = port;
+        ownerPluginId = candidateId;
       } catch {
         server.closeAllConnections();
       }
     }
-    if (!guardedServer || guardedPort === undefined) throw new Error('Could not reserve a test port');
+    if (!guardedServer || guardedPort === undefined || !ownerPluginId)
+      throw new Error('Could not reserve a derived test port');
 
     const child = new ScriptedChild(() => undefined);
     const adapter = createMiniAppNodeRuntimeAdapter({
@@ -320,9 +328,8 @@ describe('Mini App ownership before spawn', () => {
 
     try {
       const preparation = adapter.prepare({
-        candidate: candidate(),
+        candidate: candidate(ownerPluginId),
         processGeneration: 'generation-external-owner',
-        preferredPort: guardedPort,
         signal: new AbortController().signal,
         onLog: () => undefined,
       });
@@ -332,6 +339,132 @@ describe('Mini App ownership before spawn', () => {
     } finally {
       guardedServer.closeAllConnections();
       await new Promise<void>((resolve) => guardedServer.close(() => resolve()));
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('checks deterministic-port ownership even when the Host reservation skips that port', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp reserved owner '));
+    let guardedServer: Server | undefined;
+    let guardedPort: number | undefined;
+    let ownerPluginId: string | undefined;
+    for (let attempt = 0; attempt < 100 && guardedServer === undefined; attempt += 1) {
+      const candidateId = `fixture.reserved-owner-${attempt}`;
+      const port = deriveMiniAppNodePort(candidateId);
+      const server = createServer((_request, response) => response.writeHead(401).end());
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(port, '127.0.0.1', resolve);
+        });
+        guardedServer = server;
+        guardedPort = port;
+        ownerPluginId = candidateId;
+      } catch {
+        server.closeAllConnections();
+      }
+    }
+    if (!guardedServer || guardedPort === undefined || !ownerPluginId)
+      throw new Error('Could not reserve a derived test port');
+
+    const child = new ScriptedChild(() => undefined);
+    const adapter = createMiniAppNodeRuntimeAdapter({
+      resolvePluginDataDir: () => dataDir,
+      verifyCandidate: async () => true,
+      materializePackage: async ({ targetRoot }) => {
+        const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, 'export const start = async () => undefined;\n');
+      },
+      isPortReserved: ({ port }) => port === guardedPort,
+      maxPortAttempts: 1,
+      spawn: () => child as unknown as ChildProcess,
+      createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+    });
+
+    try {
+      const result = adapter.prepare({
+        candidate: candidate(ownerPluginId),
+        processGeneration: 'generation-reserved-owner',
+        signal: new AbortController().signal,
+        onLog: () => undefined,
+      });
+      const outcome = await result.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      await outcome.value?.stop();
+      expect(outcome).toHaveProperty('error');
+      expect('error' in outcome ? outcome.error : undefined).toMatchObject({
+        code: 'OWNED_ELSEWHERE',
+      });
+      expect(child.received).toHaveLength(0);
+    } finally {
+      guardedServer.closeAllConnections();
+      await new Promise<void>((resolve) => guardedServer?.close(() => resolve()));
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it('checks the derived ownership port when a different preferred listen port exists', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'miniapp preferred owner '));
+    let guardedServer: Server | undefined;
+    let pluginId: string | undefined;
+    let guardedPort: number | undefined;
+    for (let attempt = 0; attempt < 100 && guardedServer === undefined; attempt += 1) {
+      const candidateId = `fixture.preferred-owner-${attempt}`;
+      const port = deriveMiniAppNodePort(candidateId);
+      const server = createServer((_request, response) => response.writeHead(401).end());
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(port, '127.0.0.1', resolve);
+        });
+        guardedServer = server;
+        pluginId = candidateId;
+        guardedPort = port;
+      } catch {
+        server.closeAllConnections();
+      }
+    }
+    if (!guardedServer || !pluginId || guardedPort === undefined)
+      throw new Error('Could not reserve a derived test port');
+    const preferredPort = guardedPort === 65_535 ? 49_152 : guardedPort + 1;
+    const child = new ScriptedChild(() => undefined);
+    const adapter = createMiniAppNodeRuntimeAdapter({
+      resolvePluginDataDir: () => dataDir,
+      verifyCandidate: async () => true,
+      materializePackage: async ({ targetRoot }) => {
+        const target = join(targetRoot, 'miniapp', 'node', 'server.js');
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, 'export const start = async () => undefined;\n');
+      },
+      isPortReserved: () => false,
+      maxPortAttempts: 1,
+      spawn: () => child as unknown as ChildProcess,
+      createTerminator: () => ({ stop: async () => ({ proven: true }) }) as never,
+    });
+
+    try {
+      const outcome = await adapter.prepare({
+        candidate: candidate(pluginId),
+        processGeneration: 'generation-preferred-owner',
+        preferredPort,
+        signal: new AbortController().signal,
+        onLog: () => undefined,
+      }).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      await outcome.value?.stop();
+      expect(outcome).toHaveProperty('error');
+      expect('error' in outcome ? outcome.error : undefined).toMatchObject({
+        code: 'OWNED_ELSEWHERE',
+      });
+      expect(child.received).toHaveLength(0);
+    } finally {
+      guardedServer.closeAllConnections();
+      await new Promise<void>((resolve) => guardedServer?.close(() => resolve()));
       await rm(dataDir, { recursive: true, force: true });
     }
   });

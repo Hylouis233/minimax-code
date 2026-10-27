@@ -638,6 +638,13 @@ export function installFixtureTransport() {
         });
         return;
       }
+      if (frame.operation === "watchMiniAppPresenter") {
+        this.isMiniAppPresenterWatch = true;
+        this.respond(frame, { stream: true });
+        const intent = responses.get("watchMiniAppPresenter");
+        if (intent) this.streamFrame(intent);
+        return;
+      }
       if (frame.operation === "watchTerminal") {
         // The terminal watch is a stream of `WebuiTerminalFrame`s, and unlike a
         // turn stream it stays open for the life of the process. It is marked
@@ -839,6 +846,11 @@ export function installFixtureTransport() {
     emitEvent(event) {
       for (const socket of sockets) if (socket.isWatcher && !socket.closed)
         socket.emit("message", { data: JSON.stringify({ protocolVersion: 1, kind: "event", requestId: socket.request.requestId, body: clone(event) }) });
+    },
+    emitMiniAppPresenter(intent) {
+      for (const socket of sockets) {
+        if (socket.isMiniAppPresenterWatch && !socket.closed) socket.streamFrame(clone(intent));
+      }
     },
     emitStream(sessionId, streamFrame) {
       for (const socket of sockets) if (socket.isStream && socket.request?.body?.id === sessionId && !socket.closed) socket.streamFrame(streamFrame);

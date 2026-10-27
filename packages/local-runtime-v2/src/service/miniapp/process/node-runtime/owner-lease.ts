@@ -88,9 +88,11 @@ export async function acquireMiniAppOwner(
       await rm(endpoint, { force: true });
       continue;
     }
-    return { kind: 'held', ...(await readOwnerRecord(input.pluginDataDir)) };
+    const owner = await readMiniAppOwnerIdentity(input.pluginDataDir);
+    return { kind: 'held', ...(owner ? { owner } : {}) };
   }
-  return { kind: 'held', ...(await readOwnerRecord(input.pluginDataDir)) };
+  const owner = await readMiniAppOwnerIdentity(input.pluginDataDir);
+  return { kind: 'held', ...(owner ? { owner } : {}) };
 }
 
 function bind(server: net.Server, endpoint: string): Promise<boolean> {
@@ -149,9 +151,9 @@ async function writeOwnerRecord(
   }
 }
 
-async function readOwnerRecord(
+export async function readMiniAppOwnerIdentity(
   pluginDataDir: string,
-): Promise<{ readonly owner?: MiniAppOwnerIdentity }> {
+): Promise<MiniAppOwnerIdentity | undefined> {
   try {
     const raw = JSON.parse(await readFile(path.join(pluginDataDir, RECORD_FILE), 'utf8')) as unknown;
     if (
@@ -160,10 +162,10 @@ async function readOwnerRecord(
       typeof (raw as MiniAppOwnerIdentity).client === 'string' &&
       typeof (raw as MiniAppOwnerIdentity).pid === 'number'
     ) {
-      return { owner: raw as MiniAppOwnerIdentity };
+      return raw as MiniAppOwnerIdentity;
     }
   } catch {
     // An absent or unreadable record still leaves the endpoint answering for the owner.
   }
-  return {};
+  return undefined;
 }

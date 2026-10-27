@@ -206,10 +206,10 @@ new domain behaviour; they expose what the runtime already owns.
   `openPage: false` and which the shipped client reaches through a start-if-cold path rather than
   through `open`. And it needs to hand the credential and origin to the
   server: `launch` is documented as server-only coordinates that must never be forwarded to a
-  renderer, and this design honours that literally. The client receives the proxy's own view URL —
-  built from the session, the plugin and the presentation — and never the Mini App's origin, its
-  surface path or its credential. Everything that touches a Mini App's real origin stays on the
-  server side of the facade.
+  renderer, and this design honours that literally. The client receives the proxy's own view URL,
+  including the runtime-selected surface path needed to load the page, but never the Mini App's
+  origin or its credential. Everything that touches a Mini App's real origin stays on the server
+  side of the facade.
 - **The presenter stays a host-owned port.** `MiniAppPresenter` is documented as the desktop
   client's native presenter and is absent outside it. The WebUI supplies the browser
   implementation: its `open` means the client should show that Mini App, and its `close` means the
@@ -359,19 +359,23 @@ into its own browser tab; nothing else can produce a deep link a person would no
 view offers no control back to the inline one — that would be the in-page close control it deliberately
 does not have — so returning is closing the tab, which releases the lease.
 
-Two states are settled with the route. A deep link naming a session that has ended still shows the
-Mini App, with the session reported as ended, because the runtime is plugin-scoped and the page has no
-dependency on the session existing. A runtime that stops while the tab is open clears the view and
-reports the stop reason; it does not reconnect on its own, because the tab may be unattended and a
-retry loop would restart a Mini App the user did not ask for. A retry is a user action.
+The page is independent of the session named by its route: a confirmed missing session is reported as
+ended while the Mini App still shows. If session lookup fails for another reason, the page reports
+that the state is unresolved rather than claiming the session ended or dropping the presentation.
+A runtime that stops while the tab is open clears the view and reports the stop reason; it does not
+restart the Mini App, because the tab may be unattended and a retry would start work the user did not
+ask for. A retry is a user action.
 
 ### The standalone presentation is a lease
 
 Because the two presentations are two client documents that share nothing but the service, the service
 holds the record of which one is live. A standalone client declares its plugin, its session and its
-presentation when it connects, and the record is released when that client's socket closes. The inline
-view reads the record, which is what lets it show that a Mini App is already open elsewhere and offer
-to switch instead of opening a second tab.
+presentation when it connects, and the record is released when that client's socket closes. If the
+watch connection drops unexpectedly while the document is still open, the client reconnects with
+backoff and declares a new lease; this restores presentation ownership but never starts the Mini App
+runtime. Closing the tab stops the watcher and releases the lease. The inline view reads the record,
+which is what lets it show that a Mini App is already open elsewhere and offer to switch instead of
+opening a second tab.
 
 That record is also what gives `detached` and `presentationRevision` meaning in this client, rather
 than leaving them as fields this port always answers with `false` and `0`. `detached` is "a standalone

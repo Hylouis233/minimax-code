@@ -1,5 +1,6 @@
 import http from 'node:http';
 import net from 'node:net';
+import { gzipSync } from 'node:zlib';
 import type { Duplex } from 'node:stream';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -28,7 +29,7 @@ let proxy: MiniAppProxy;
 beforeAll(async () => {
   upstream = http.createServer((request, response) => {
     seen.push({ method: request.method, url: request.url, headers: { ...request.headers } });
-    if (request.url === '/page') {
+    if (request.url?.startsWith('/page')) {
       response
         .writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
@@ -36,6 +37,17 @@ beforeAll(async () => {
           'content-security-policy': "default-src 'self'; frame-ancestors 'none'; script-src 'self'",
         })
         .end('<!doctype html><html><head><title>app</title></head><body>page</body></html>');
+      return;
+    }
+    if (request.url === '/compressed') {
+      const body = gzipSync('<!doctype html><html><head></head><body>compressed</body></html>');
+      response
+        .writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'content-encoding': 'gzip',
+          'content-length': body.byteLength,
+        })
+        .end(body);
       return;
     }
     if (request.url === '/bare') {
@@ -62,6 +74,7 @@ beforeAll(async () => {
     target: {
       pluginId: 'fixture.miniapp',
       upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+      surfacePath: '/page?mode=dashboard',
       credential: CREDENTIAL,
       credentialHeader: CREDENTIAL_HEADER,
     },
@@ -106,6 +119,16 @@ function get(port: number, path: string): Promise<Result> {
 }
 
 describe('Mini App proxy', () => {
+  it('returns the runtime-selected surface path as the framed URL', () => {
+    expect(proxy.viewUrl).toBe(`http://127.0.0.1:${proxy.port}/page?mode=dashboard`);
+  });
+
+  it('forwards the selected surface path with its query unchanged', async () => {
+    const result = await get(proxy.port, '/page?mode=dashboard');
+
+    expect(result.status).toBe(200);
+    expect(seen.at(-1)?.url).toBe('/page?mode=dashboard');
+  });
   it('forwards the path unchanged and returns the upstream response', async () => {
     const result = await get(proxy.port, '/echo');
 
@@ -119,7 +142,17 @@ describe('Mini App proxy', () => {
     const result = await get(proxy.port, '/echo');
 
     expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
+    expect(seen.at(-1)?.headers.host).toBe(`127.0.0.1:${upstreamPort}`);
     expect(result.headers).not.toHaveProperty(CREDENTIAL_HEADER);
+  });
+
+  it('rewrites a compressed HTML document after decoding it', async () => {
+    const result = await get(proxy.port, '/compressed');
+
+    expect(result.status).toBe(200);
+    expect(result.headers).not.toHaveProperty('content-encoding');
+    expect(result.body).toContain('<script src="/__miniapp/bridge.js"></script></head>');
+    expect(result.body).toContain('compressed');
   });
 
   it('forwards an upgrade with the credential', async () => {
@@ -146,6 +179,7 @@ describe('Mini App proxy', () => {
     expect(response).toContain('101');
     expect(seen.at(-1)?.url).toBe('/socket');
     expect(seen.at(-1)?.headers[CREDENTIAL_HEADER]).toBe(CREDENTIAL);
+    expect(seen.at(-1)?.headers.host).toBe(`127.0.0.1:${upstreamPort}`);
   });
 
   it('keeps one plugin on the same port across a restart, so the page storage survives', async () => {
@@ -153,6 +187,7 @@ describe('Mini App proxy', () => {
     const target = {
       pluginId: 'fixture.miniapp',
       upstreamOrigin: `http://127.0.0.1:${upstreamPort}`,
+      surfacePath: '/page?mode=dashboard',
       credential: CREDENTIAL,
       credentialHeader: CREDENTIAL_HEADER,
     };
@@ -209,6 +244,15 @@ describe('Mini App proxy document rewrite', () => {
     expect(result.status).toBe(200);
     expect(result.body).toBe('globalThis.__bridge = true;');
     expect(result.headers['content-type']).toContain('text/javascript');
+    expect(seen.length).toBe(before);
+  });
+
+  it('serves the bridge when the browser appends a cache-busting query', async () => {
+    const before = seen.length;
+    const result = await get(proxy.port, '/__miniapp/bridge.js?v=1');
+
+    expect(result.status).toBe(200);
+    expect(result.body).toBe('globalThis.__bridge = true;');
     expect(seen.length).toBe(before);
   });
 });

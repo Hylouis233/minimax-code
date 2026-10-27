@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import net from 'node:net';
+import { type Readable } from 'node:stream';
+import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib';
 
 /**
  * The Mini App's real origin and the credential its own guard demands.
@@ -11,6 +13,8 @@ import net from 'node:net';
 export interface MiniAppProxyTarget {
   readonly pluginId: string;
   readonly upstreamOrigin: string;
+  /** The runtime-selected page the client should frame, including its query. */
+  readonly surfacePath: string;
   readonly credential: string;
   /** Request header the upstream guard reads the credential from. */
   readonly credentialHeader: string;
@@ -74,11 +78,15 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
     throw new TypeError('A Mini App proxy forwards to an http origin on loopback');
   }
   const port = input.port ?? deriveMiniAppProxyPort(input.target.pluginId);
+  const surface = new URL(input.target.surfacePath, 'http://miniapp.invalid');
+  if (!input.target.surfacePath.startsWith('/') || surface.origin !== 'http://miniapp.invalid') {
+    throw new TypeError('A Mini App surface path must be an absolute path on its own origin');
+  }
   // Anything this listener owns that can be torn down: inbound sockets, forwarded requests, upgrade pairs.
   const sockets = new Set<{ destroy(): void }>();
 
   const server = http.createServer((request, response) => {
-    if (input.bridge && request.url === input.bridge.path) {
+    if (input.bridge && request.url?.split('?', 1)[0] === input.bridge.path) {
       response
         .writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' })
         .end(input.bridge.script);
@@ -92,6 +100,10 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
         path: request.url,
         headers: {
           ...request.headers,
+          // The Mini App guard validates its own loopback Host. The browser sent
+          // the proxy's origin, so forwarding that value makes every request fail
+          // the guard even though the credential is correct.
+          host: upstream.host,
           [input.target.credentialHeader]: input.target.credential,
         },
         agent: false,
@@ -105,19 +117,34 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
         }
         // The document is the one response this proxy rewrites: the page bridge has to be in it before
         // the page's own scripts run, and a page cannot be allowed to decide it will not be framed.
+        let html: Readable;
+        try {
+          html = decodeHtmlResponse(upstreamResponse);
+        } catch {
+          response.writeHead(502, { 'content-type': 'text/plain' });
+          response.end('Mini App HTML used an unsupported content encoding');
+          upstreamResponse.destroy();
+          return;
+        }
         const chunks: Buffer[] = [];
-        upstreamResponse.on('data', (chunk: Buffer) => chunks.push(chunk));
-        upstreamResponse.on('end', () => {
+        html.on('data', (chunk: Buffer | string) =>
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+        );
+        html.on('end', () => {
           const body = Buffer.from(
             injectBridge(Buffer.concat(chunks).toString('utf8'), input.bridge as MiniAppPageBridge),
             'utf8',
           );
-          // The body length changed, so the upstream framing no longer applies.
+          // Rewriting invalidates compression, validators and upstream framing.
           delete headers['transfer-encoding'];
+          delete headers['content-encoding'];
           headers['content-length'] = String(body.byteLength);
+          delete headers.etag;
+          delete headers['content-md5'];
           response.writeHead(upstreamResponse.statusCode ?? 502, headers);
           response.end(body);
         });
+        html.on('error', () => response.destroy());
         upstreamResponse.on('error', () => response.destroy());
       },
     );
@@ -143,8 +170,9 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
       { host: upstream.hostname, port: Number(upstream.port || 80) },
       () => {
         const headers = Object.entries(request.headers)
-          .filter(([name, value]) => value !== undefined)
+          .filter(([name, value]) => value !== undefined && name.toLowerCase() !== 'host')
           .map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : value}`);
+        headers.push(`host: ${upstream.host}`);
         headers.push(`${input.target.credentialHeader}: ${input.target.credential}`);
         upstreamSocket.write(
           `${request.method} ${request.url} HTTP/1.1\r\n${headers.join('\r\n')}\r\n\r\n`,
@@ -181,13 +209,29 @@ export async function startMiniAppProxy(input: StartMiniAppProxyInput): Promise<
 
   return {
     port: boundPort,
-    viewUrl: `http://127.0.0.1:${boundPort}`,
+    viewUrl: `http://127.0.0.1:${boundPort}${surface.pathname}${surface.search}${surface.hash}`,
     async close() {
       for (const socket of sockets) socket.destroy();
       sockets.clear();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
+}
+
+function decodeHtmlResponse(response: http.IncomingMessage): Readable {
+  const encoding = response.headers['content-encoding']?.trim().toLowerCase();
+  if (!encoding || encoding === 'identity') return response;
+  const decoder =
+    encoding === 'gzip' || encoding === 'x-gzip'
+      ? createGunzip()
+      : encoding === 'deflate'
+        ? createInflate()
+        : encoding === 'br'
+          ? createBrotliDecompress()
+          : undefined;
+  if (!decoder) throw new TypeError(`Unsupported Mini App HTML content encoding: ${encoding}`);
+  response.pipe(decoder);
+  return decoder;
 }
 
 function isHtml(headers: http.IncomingHttpHeaders): boolean {

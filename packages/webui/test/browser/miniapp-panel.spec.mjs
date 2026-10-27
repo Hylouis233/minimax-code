@@ -137,6 +137,43 @@ test("the launcher's 应用 tile opens the picker and the chosen Mini App is fra
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "miniapp");
 });
 
+test("an agent presenter request selects its session and displays the Mini App", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", {
+        miniApps: [{
+          pluginId: "demo.miniapp",
+          displayName: "演示应用",
+          runtime: { kind: "process", status: "running" },
+        }],
+      });
+      window.__fixture.setResponse("openMiniApp", {
+        pluginId: "demo.miniapp",
+        viewUrl: window.location.origin + "/__miniapp-agent-open",
+        connection: 3,
+      });
+      window.__fixture.setResponse("watchMiniAppPresenter", {
+        epoch: "service-epoch-1",
+        revision: 1,
+        action: "open",
+        sessionId: "B",
+        pluginId: "demo.miniapp",
+      });
+    });
+  });
+  await page.route("**/__miniapp-agent-open", (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<p>Agent Mini App</p>" }),
+  );
+  await openApp(page, "#session=A");
+
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("#session=B");
+  await expect(page.getByText("History B synthetic")).toBeVisible();
+  await expect(page.getByTestId("workspace-panel")).toBeVisible();
+  await expect(page.getByTestId("miniapp-view-frame")).toBeVisible();
+  await expect(page.getByTestId("miniapp-view-frame")).toHaveAttribute("src", /__miniapp-agent-open/u);
+});
+
 test("a Mini App owned by another client reports the refusal and stays unopened here", async ({ page }) => {
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];

@@ -1,6 +1,6 @@
 // Dedicated handlers: the Mini App surface.
 //
-// None of the four can be a plain binding. `openMiniApp` shapes its response —
+// None of the five can be a plain binding. `openMiniApp` shapes its response —
 // the client is handed the loopback proxy's URL, never the Mini App's own origin
 // or the credential its guard demands — and `stopMiniApp` owns the other half of
 // that proxy's lifetime. `listMiniApps` keeps their company rather than becoming a
@@ -25,6 +25,7 @@ import {
   openMiniAppOperation,
   stopMiniAppOperation,
   watchMiniAppPresentationOperation,
+  watchMiniAppPresenterOperation,
 } from "../miniapp.js";
 import {
   startMiniAppProxy,
@@ -43,6 +44,7 @@ import {
 import { createMiniAppAgentPanels, type MiniAppAgentPanels } from "../../miniapp/agent-panels.js";
 import { createMiniAppAgentRuns, type MiniAppAgentRuns } from "../../miniapp/agent-runs.js";
 import { miniAppPageBridge } from "../../miniapp/bridge.js";
+import type { MiniAppPresenterView } from "../../miniapp/presenter.js";
 import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppPresentationState,
@@ -97,6 +99,8 @@ function requireMiniApps(port: WebuiOperationPort): MiniAppCapability {
 }
 
 export interface MiniAppHandlerOptions {
+  /** The host-owned presenter whose open/close requests the browser must enact. */
+  readonly presenter?: MiniAppPresenterView;
   /**
    * Starts one plugin's loopback listener. Defaults to the real proxy.
    *
@@ -232,8 +236,9 @@ export function createMiniAppHandlerEntries(
    * `SESSION_NOT_FOUND`. Everything else is rethrown, because a host whose lookup
    * failed has said nothing about the person's session, and reporting that as
    * "ended" would turn an infrastructure failure into a fact about their data.
-   * The stream then fails and the standalone surface says it could not confirm the
-   * session, which is the honest state.
+   * The stream still holds its presentation lease and reports an unresolved
+   * session. That is distinct from a confirmed absence, and the standalone page
+   * can keep rendering the plugin-scoped Mini App while saying lookup failed.
    */
   async function sessionStateOf(sessionId: string): Promise<"live" | "ended"> {
     const lookup = await port.getSession({ id: sessionId }).catch((error: unknown) => {
@@ -256,7 +261,6 @@ export function createMiniAppHandlerEntries(
   async function* presentationSource(input: {
     readonly pluginId: string;
     readonly sessionId: string;
-    readonly session: "live" | "ended";
     readonly signal?: AbortSignal;
   }): AsyncGenerator<WebuiMiniAppPresentationState> {
     const lease = presentations.acquire({
@@ -264,11 +268,20 @@ export function createMiniAppHandlerEntries(
       sessionId: input.sessionId,
     });
     try {
+      let session: WebuiMiniAppPresentationState["session"];
+      try {
+        session = await sessionStateOf(input.sessionId);
+      } catch {
+        // Session lookup is observational. Keep the presentation lease alive and
+        // report that the session could not be confirmed instead of treating the
+        // whole Mini App document as absent or falsely calling the session ended.
+        session = "unresolved";
+      }
       yield {
         pluginId: lease.pluginId,
         sessionId: lease.sessionId,
         presentationRevision: lease.presentationRevision,
-        session: input.session,
+        session,
       };
       // No signal means no connection lifetime to hold the lease for, so the
       // frame is the whole answer rather than a lease nobody can release.
@@ -320,11 +333,49 @@ export function createMiniAppHandlerEntries(
         source: presentationSource({
           pluginId: body.pluginId,
           sessionId: body.sessionId,
-          session: await sessionStateOf(body.sessionId),
           ...(context.signal ? { signal: context.signal } : {}),
         }) as unknown as AsyncIterable<Record<string, unknown>>,
       },
     };
+  };
+
+  const watchMiniAppPresenter: DedicatedHandler<typeof watchMiniAppPresenterOperation> = async (
+    context: WebuiOperationContext,
+  ) => {
+    const presenter = options.presenter;
+    if (!presenter) throw new Error("Mini App presenter is unavailable");
+    const source = (async function* () {
+      let wake: (() => void) | undefined;
+      const queued = [] as ReturnType<MiniAppPresenterView["snapshot"]>[];
+      const enqueue = (intent: NonNullable<ReturnType<MiniAppPresenterView["snapshot"]>>) => {
+        queued.push(intent);
+        wake?.();
+      };
+      const unsubscribe = presenter.subscribe(enqueue);
+      const initial = presenter.snapshot();
+      if (initial) queued.push(initial);
+      try {
+        while (!context.signal?.aborted) {
+          const intent = queued.shift();
+          if (intent) {
+            yield intent;
+            continue;
+          }
+          await new Promise<void>((resolve) => {
+            const finish = (): void => {
+              context.signal?.removeEventListener("abort", finish);
+              wake = undefined;
+              resolve();
+            };
+            wake = finish;
+            context.signal?.addEventListener("abort", finish, { once: true });
+          });
+        }
+      } finally {
+        unsubscribe();
+      }
+    })();
+    return { stream: { ok: true as const, source: source as AsyncIterable<Record<string, unknown>> } };
   };
 
   const openMiniApp: DedicatedHandler<typeof openMiniAppOperation> = async (
@@ -341,6 +392,7 @@ export function createMiniAppHandlerEntries(
         const proxy = await replaceProxy({
           pluginId: launch.miniApp.pluginId,
           upstreamOrigin: launch.launch.origin,
+          surfacePath: launch.launch.surfacePath,
           credential: launch.launch.credential,
           credentialHeader: launch.launch.credentialHeader,
         });
@@ -439,6 +491,13 @@ export function createMiniAppHandlerEntries(
       {
         operation: watchMiniAppPresentationOperation,
         handle: watchMiniAppPresentation as WebuiOperationHandler<unknown>,
+      },
+    ],
+    [
+      watchMiniAppPresenterOperation.name,
+      {
+        operation: watchMiniAppPresenterOperation,
+        handle: watchMiniAppPresenter as WebuiOperationHandler<unknown>,
       },
     ],
   ]);

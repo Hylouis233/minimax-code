@@ -17,12 +17,23 @@ function build(onClosed?: (input: { readonly pluginId: string }) => void) {
 describe('Mini App presenter', () => {
   it('selects the session and records what the panel is showing', async () => {
     const { view, selected } = build();
+    const intents: unknown[] = [];
+    const unsubscribe = view.subscribe((intent) => intents.push(intent));
 
     expect(view.presented()).toBeUndefined();
     await view.presenter.open({ sessionId: 'session-1', pluginId: 'fixture.miniapp' });
 
     expect(selected).toEqual([{ sessionId: 'session-1', pluginId: 'fixture.miniapp' }]);
     expect(view.presented()).toEqual({ sessionId: 'session-1', pluginId: 'fixture.miniapp' });
+    expect(view.snapshot()).toEqual({
+      epoch: expect.any(String),
+      revision: 1,
+      action: 'open',
+      sessionId: 'session-1',
+      pluginId: 'fixture.miniapp',
+    });
+    expect(intents).toEqual([view.snapshot()]);
+    unsubscribe();
   });
 
   it('refuses to open when the caller has already aborted', async () => {
@@ -37,6 +48,19 @@ describe('Mini App presenter', () => {
     expect(view.presented()).toBeUndefined();
   });
 
+  it('uses a new epoch when a replacement service creates the presenter', async () => {
+    const previous = build().view;
+    await previous.presenter.open({ sessionId: 'session-1', pluginId: 'fixture.miniapp' });
+    const previousEpoch = previous.snapshot()?.epoch;
+
+    const replacement = build().view;
+    await replacement.presenter.open({ sessionId: 'session-2', pluginId: 'fixture.miniapp' });
+
+    expect(previousEpoch).toEqual(expect.any(String));
+    expect(replacement.snapshot()?.epoch).toEqual(expect.any(String));
+    expect(replacement.snapshot()?.epoch).not.toBe(previousEpoch);
+  });
+
   it('keeps one presentation: a second open replaces the first', async () => {
     const { view } = build();
 
@@ -49,6 +73,8 @@ describe('Mini App presenter', () => {
   it('closes only the Mini App it is showing, and only once', async () => {
     const onClosed = vi.fn();
     const { view } = build(onClosed);
+    const intents: unknown[] = [];
+    view.subscribe((intent) => intents.push(intent));
     await view.presenter.open({ sessionId: 'session-1', pluginId: 'shown' });
 
     await view.presenter.close({ pluginId: 'other' });
@@ -57,6 +83,17 @@ describe('Mini App presenter', () => {
 
     await view.presenter.close({ pluginId: 'shown' });
     expect(view.presented()).toBeUndefined();
+    expect(view.snapshot()).toEqual({
+      epoch: expect.any(String),
+      revision: 2,
+      action: 'close',
+      sessionId: 'session-1',
+      pluginId: 'shown',
+    });
+    expect(intents).toEqual([
+      { epoch: expect.any(String), revision: 1, action: 'open', sessionId: 'session-1', pluginId: 'shown' },
+      { epoch: expect.any(String), revision: 2, action: 'close', sessionId: 'session-1', pluginId: 'shown' },
+    ]);
     expect(onClosed).toHaveBeenCalledTimes(1);
 
     await view.presenter.close({ pluginId: 'shown' });

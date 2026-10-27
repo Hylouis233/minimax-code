@@ -54,6 +54,10 @@ export function MiniAppStandalone({
     standalone !== undefined &&
     standalone.pluginId === pluginId &&
     standalone.session === "ended";
+  const sessionUnresolved =
+    standalone !== undefined &&
+    standalone.pluginId === pluginId &&
+    standalone.session === "unresolved";
 
   return (
     <div
@@ -69,6 +73,11 @@ export function MiniAppStandalone({
           data-testid="miniapp-standalone-session-ended"
         >
           该会话已结束，Mini App 仍在运行。
+        </p>
+      ) : null}
+      {sessionUnresolved ? (
+        <p className="webui-miniapp-standalone-notice" role="status" data-testid="miniapp-standalone-session-lookup-unresolved">
+          无法确认会话状态，Mini App 仍在运行。
         </p>
       ) : null}
       {state.standaloneFailure !== undefined ? (

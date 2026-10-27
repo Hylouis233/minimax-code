@@ -161,6 +161,18 @@ export function MiniAppView({
   }, [presentation?.kind, workflows]);
 
   /**
+   * A standalone document can replace the service connection while this inline
+   * view remains mounted. When its lease ends, reacquire the current generation
+   * before sending any more page bridge calls through the old one.
+   */
+  useEffect(() => {
+    if (standalone || detached || presentation?.kind !== "open" || !workflows) return;
+    if (row && row.presentationRevision > presentation.presentationRevision) {
+      void workflows.refreshInline(pluginId);
+    }
+  }, [detached, pluginId, presentation, row?.presentationRevision, standalone, workflows]);
+
+  /**
    * Claim the tab's browsing-context name, so the inline view can focus it.
    *
    * A tab opened by the inline control already has the name it was opened with; a

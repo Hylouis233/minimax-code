@@ -95,7 +95,7 @@ const terminal = new WebuiTerminalManager();
 await browser.initialize();
 const service = new WebuiService({
   port,
-  operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies),
+  operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies, miniAppPresenter),
   terminal,
   host: "127.0.0.1",
   tcpPort,

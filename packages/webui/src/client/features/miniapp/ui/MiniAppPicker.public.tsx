@@ -43,6 +43,15 @@ export function MiniAppPicker({ sessionId, onOpened, onClose }: MiniAppPickerPro
 
   useEffect(() => {
     void workflows?.loadListing();
+    const refresh = () => {
+      if (document.visibilityState === "visible") void workflows?.loadListing();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [workflows]);
 
   return (
@@ -100,14 +109,16 @@ export function MiniAppPicker({ sessionId, onOpened, onClose }: MiniAppPickerPro
               <div className="webui-plugin-actions">
                 <button
                   type="button"
-                  disabled={state.opening === row.pluginId}
+                  data-testid={`miniapp-picker-open-${row.pluginId}`}
+                  disabled={state.opening === row.pluginId || row.ownedElsewhere}
+                  title={row.ownedElsewhere ? `另一个客户端${row.ownerClient ? `（${row.ownerClient}）` : ""}正在运行此 Mini App` : undefined}
                   onClick={() => {
                     void workflows?.open(row.pluginId).then((opened) => {
                       if (opened) onOpened(row.pluginId);
                     });
                   }}
                 >
-                  打开
+                  {row.ownedElsewhere ? `其他客户端运行中${row.ownerClient ? `（${row.ownerClient}）` : ""}` : "打开"}
                 </button>
                 <button
                   type="button"

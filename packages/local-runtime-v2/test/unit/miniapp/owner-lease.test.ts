@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   acquireMiniAppOwner,
+  readMiniAppOwnerIdentity,
   resolveMiniAppOwnerEndpoint,
   type MiniAppOwnerAcquisition,
 } from '../../../src/service/miniapp/process/node-runtime/owner-lease.js';
@@ -52,6 +53,7 @@ describe('Mini App ownership', () => {
     const dir = await pluginDataDir();
 
     expect((await acquire(dir, 'desktop')).kind).toBe('acquired');
+    expect(await readMiniAppOwnerIdentity(dir)).toMatchObject({ client: 'desktop', pid: process.pid });
 
     const second = await acquire(dir, 'webui');
     expect(second.kind).toBe('held');

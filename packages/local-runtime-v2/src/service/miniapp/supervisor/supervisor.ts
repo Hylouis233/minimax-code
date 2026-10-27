@@ -688,6 +688,10 @@ export class DefaultMiniAppSupervisor implements MiniAppSupervisor {
     return this.active.get(pluginId)?.runtime?.loopbackToken;
   }
 
+  ownerClient(pluginId: string): Promise<string | undefined> {
+    return this.options.nodeRuntime.ownerClient?.(pluginId) ?? Promise.resolve(undefined);
+  }
+
   inspect(pluginId?: string): readonly MiniAppStatus[] {
     const ids = pluginId
       ? [pluginId]

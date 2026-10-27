@@ -20,6 +20,7 @@
 import type {
   WebuiMiniAppCatalogue,
   WebuiMiniAppPresentationState,
+  WebuiMiniAppPresentationIntent,
   WebuiMiniAppView,
 } from "../../../../shared/contracts/miniapp.js";
 import type {
@@ -30,6 +31,11 @@ import type {
 } from "../../../../shared/contracts/miniapp-agent.js";
 
 export interface MiniAppPort {
+  /** Follow the host-owned agent presentation request and enact it in the shell. */
+  readonly watchMiniAppPresenter?: (
+    onFrame: (intent: WebuiMiniAppPresentationIntent) => void,
+    onFailure?: (error: Error) => void,
+  ) => () => void;
   /**
    * The installed Mini Apps, with the runtime state and the live presentation the
    * row renders.

@@ -718,7 +718,14 @@ async function initializeRuntimeServiceOwners(
     );
     bindTaskAgentBindingCapture(input, { plugin, mcp }, pluginLogger);
     miniAppComposition = await composeMiniAppRuntimeCapability({
-      options: miniAppOptions,
+      options: miniAppOptions
+        ? {
+            ...miniAppOptions,
+            // Honor an explicit Mini App option; otherwise report the runtime
+            // owner that actually holds the process lease (WebUI, Electron, TUI).
+            ownerClient: miniAppOptions.ownerClient ?? input.options.ownerPolicy.kind,
+          }
+        : undefined,
       db: input.options.db,
       dataDir: input.options.dataDir,
       nowMs: input.nowMs,
