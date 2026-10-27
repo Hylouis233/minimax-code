@@ -142,12 +142,24 @@ export interface WebuiMiniAppWorkflowsState {
    * session nobody shows must not stay answerable, or its permission asks wait on
    * a panel that is gone.
    */
-  readonly agentShown?: {
-    readonly pluginId: string;
-    readonly sessionId: string;
-    readonly hostSessionId: string;
-    readonly connection: number;
-  };
+  readonly agentShown?: WebuiMiniAppAgentPanel;
+  /**
+   * The presentation the page asked for, closed because the person left it.
+   *
+   * Kept so coming back re-reports it: the runtime denies an ask while nothing
+   * shows the session, and "the rail has it selected again" is a fact only a new
+   * `panelOpened` can convey. Dropped on unmount, navigation and stop, because
+   * those mean the page is not coming back.
+   */
+  readonly agentResting?: WebuiMiniAppAgentPanel;
+}
+
+/** One Mini App session a page asked the host to show, and where it is shown. */
+export interface WebuiMiniAppAgentPanel {
+  readonly pluginId: string;
+  readonly sessionId: string;
+  readonly hostSessionId: string;
+  readonly connection: number;
 }
 
 export const initialWebuiMiniAppListing: WebuiMiniAppListing = {
@@ -589,8 +601,19 @@ export function createWebuiMiniAppWorkflows(deps: {
   };
 
   /** Stops counting one shown session as answerable, and says so. */
-  const closeShown = async (shown: NonNullable<WebuiMiniAppWorkflowsState["agentShown"]>): Promise<void> => {
-    set((current) => (current.agentShown === shown ? { ...current, agentShown: undefined } : current));
+  const closeShown = async (
+    shown: WebuiMiniAppAgentPanel,
+    options: { readonly keep: boolean } = { keep: true },
+  ): Promise<void> => {
+    set((current) =>
+      current.agentShown !== shown
+        ? current
+        : {
+            ...current,
+            agentShown: undefined,
+            ...(options.keep ? { agentResting: shown } : {}),
+          },
+    );
     await agentCall({
       pluginId: shown.pluginId,
       hostSessionId: shown.hostSessionId,
@@ -613,14 +636,52 @@ export function createWebuiMiniAppWorkflows(deps: {
     // Only a session the runtime accepted is recorded: recording it on a refused
     // report would make the close report name a panel the runtime never knew about.
     if (!response.ok) return;
-    set((current) => ({ ...current, agentShown: input }));
+    set((current) => ({ ...current, agentShown: input, agentResting: undefined }));
+  };
+
+  /**
+   * Report a resting presentation again, because the person selected it.
+   *
+   * The one report that makes a Mini App session's asks answerable while the rail
+   * has it. Guarded against a burst of store notifications: the owner notifies on
+   * every snapshot change, and a second `panelOpened` per tick is noise.
+   */
+  let reopening = false;
+  const reopen = async (resting: WebuiMiniAppAgentPanel): Promise<void> => {
+    if (reopening) return;
+    reopening = true;
+    try {
+      const response = await agentCall({
+        pluginId: resting.pluginId,
+        hostSessionId: resting.hostSessionId,
+        connection: resting.connection,
+        requestId: `panel-shown-${resting.sessionId}`,
+        method: "panelOpened",
+        targetSessionId: resting.sessionId,
+      });
+      if (!response.ok) return;
+      set((current) =>
+        current.agentResting !== resting
+          ? current
+          : { ...current, agentShown: resting, agentResting: undefined },
+      );
+    } finally {
+      reopening = false;
+    }
   };
 
   const noteSelectedSession: WebuiMiniAppWorkflows["noteSelectedSession"] = (sessionId) => {
     const shown = state.agentShown;
-    if (!shown) return;
-    if (shown.sessionId === sessionId) return;
-    void closeShown(shown);
+    if (shown) {
+      if (shown.sessionId === sessionId) return;
+      // Leaving it withdraws the fact the runtime acts on.
+      void closeShown(shown);
+      return;
+    }
+    const resting = state.agentResting;
+    // Coming back is a new claim: without it the session stays unanswerable while
+    // the rail shows it, which is the state AC6 says must be answerable.
+    if (resting && resting.sessionId === sessionId) void reopen(resting);
   };
 
   /**
@@ -657,8 +718,18 @@ export function createWebuiMiniAppWorkflows(deps: {
 
   const releaseShown: WebuiMiniAppWorkflows["releaseShown"] = (pluginId) => {
     const shown = state.agentShown;
-    if (!shown || shown.pluginId !== pluginId) return;
-    void closeShown(shown);
+    if (shown && shown.pluginId === pluginId) {
+      // Nothing shows it any more and nothing is coming back, so the lease is
+      // closed and forgotten rather than kept for a later selection.
+      void closeShown(shown, { keep: false });
+      return;
+    }
+    const resting = state.agentResting;
+    if (resting && resting.pluginId === pluginId) {
+      set((current) =>
+        current.agentResting === resting ? { ...current, agentResting: undefined } : current,
+      );
+    }
   };
 
   const mutatePlugin = async (

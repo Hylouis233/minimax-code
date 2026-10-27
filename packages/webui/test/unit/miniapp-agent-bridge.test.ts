@@ -678,20 +678,77 @@ describe("the shown presentation", () => {
     expect(calls.map((call) => call.method)).toEqual(["panelOpened", "panelClosed"]);
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
 
-    // Coming back is a new claim, so the runtime is told again.
+    // Coming back is the rail's own path too: the page is not asked again, the
+    // business reports the session it remembered — without which the runtime would
+    // keep denying that session's asks while the rail shows it.
     store.select(MINI_SESSION);
     await settle();
-    await workflows.reportShown({
-      pluginId: PLUGIN,
-      sessionId: MINI_SESSION,
-      hostSessionId: HOST_SESSION,
-      connection: 1,
-    });
     expect(calls.map((call) => call.method)).toEqual([
       "panelOpened",
       "panelClosed",
       "panelOpened",
     ]);
+    expect(workflows.getSnapshot().agentShown?.sessionId).toBe(MINI_SESSION);
+
+    // A lease released for good is not revived by a later selection: the page is
+    // gone, so nothing would be on screen.
+    workflows.releaseShown(PLUGIN);
+    await settle();
+    store.select("another-session");
+    await settle();
+    store.select(MINI_SESSION);
+    await settle();
+    expect(calls.filter((call) => call.method === "panelOpened")).toHaveLength(2);
+    expect(workflows.getSnapshot().agentShown).toBeUndefined();
+  });
+
+  it("keeps the panels it must close when the stop itself fails", async () => {
+    const { connections, runs, panels } = registries();
+    connections.register({ pluginId: PLUGIN, runId: "gen-1" });
+    const closed: string[] = [];
+    const port = {
+      listMiniApps: async () => ({ miniApps: [] }),
+      openMiniApp: async () => {
+        throw new Error("not used");
+      },
+      // The runtime refuses to stop: its listener stays, so a retry must still know
+      // which panels to close.
+      stopMiniApp: async () => {
+        throw new Error("stop failed");
+      },
+      panelClosedMiniAppAgentSession: async (input: { sessionId: string }) => {
+        closed.push(input.sessionId);
+      },
+    } as unknown as WebuiHarnessPort;
+    const entries = createMiniAppHandlerEntries(port, { connections, panels, runs });
+    const agentEntries = createMiniAppAgentHandlerEntries(agentPort(), {
+      connections,
+      runs,
+      panels,
+    });
+
+    // A page shows a session, then the stop fails.
+    await agentEntries.get("miniAppAgentCall")!.handle(
+      { requestId: "wire-1" },
+      {
+        pluginId: PLUGIN,
+        hostSessionId: HOST_SESSION,
+        connection: 1,
+        requestId: "call-1",
+        method: "panelOpened",
+        targetSessionId: MINI_SESSION,
+      },
+    );
+    expect(panels.forPlugin(PLUGIN)).toHaveLength(1);
+
+    await expect(
+      entries.get("stopMiniApp")!.handle({ requestId: "wire-2" }, { pluginId: PLUGIN }),
+    ).rejects.toThrow("stop failed");
+
+    expect(closed).toEqual([MINI_SESSION]);
+    // Still recorded, so the retry closes it rather than leaving the runtime's
+    // record stale for the plugin's next start.
+    expect(panels.forPlugin(PLUGIN)).toHaveLength(1);
   });
 
   it("waits for the selection instead of claiming it", async () => {

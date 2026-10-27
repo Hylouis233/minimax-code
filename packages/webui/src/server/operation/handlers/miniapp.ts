@@ -389,7 +389,7 @@ export function createMiniAppHandlerEntries(
        *    generation: the page is gone with its listener, so nothing may act as
        *    this plugin any more and the next start is a new generation.
        */
-      for (const panel of panels.take(body.pluginId)) {
+      for (const panel of panels.forPlugin(body.pluginId)) {
         await port
           .panelClosedMiniAppAgentSession?.({
             sessionId: panel.sessionId,
@@ -403,6 +403,10 @@ export function createMiniAppHandlerEntries(
         signal: context.signal,
       });
       await closeProxy(body.pluginId);
+      // Dropped only after the stop succeeded: a stop that threw leaves the listener
+      // where it was for a retry, and a retry still has to know which panels to
+      // close. The closes above are idempotent, so repeating them costs nothing.
+      panels.take(body.pluginId);
       connections.revoke(body.pluginId);
       return { body: { success: true as const } };
     });
