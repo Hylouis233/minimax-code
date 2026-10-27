@@ -12,7 +12,7 @@ describe('resolveRuntimeMiniAppOptions', () => {
     expect(resolveRuntimeMiniAppOptions({ miniAppService: false })).toBeUndefined();
   });
 
-  it('keeps explicit options reachable, including with no declared owner kind', () => {
+  it('keeps explicit options reachable even when the policy cell is false', () => {
     const miniApp = { dataDir: '/tmp/miniapp' } as Parameters<
       typeof resolveRuntimeMiniAppOptions
     >[0]['miniApp'];
@@ -21,11 +21,4 @@ describe('resolveRuntimeMiniAppOptions', () => {
     expect(resolveRuntimeMiniAppOptions({ miniApp, miniAppService: false })).toBe(miniApp);
   });
 
-  it('no longer reads the owner kind directly, so a row cannot disagree with the cell', () => {
-    // The cell is the only owner-derived input: an electron runtime whose row does not carry it
-    // gets no service, which is what makes the capability flag and the service agree.
-    expect(
-      resolveRuntimeMiniAppOptions({ runtimeOwnerKind: 'electron', miniAppService: false }),
-    ).toBeUndefined();
-  });
 });

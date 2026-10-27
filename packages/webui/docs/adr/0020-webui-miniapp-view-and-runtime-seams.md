@@ -1,7 +1,6 @@
 # WebUI Mini App view and its runtime seams
 
-**Status:** Product direction accepted and the decisions below settled; implementation is pending and
-the questions at the end of this record remain open.
+**Status:** Product direction accepted and implemented in the Mini App hosting stack.
 **Date:** 2026-10-20, revised 2026-10-26.
 
 The WebUI will host Mini Apps. A Mini App's page is rendered as an iframe the client loads
@@ -449,11 +448,18 @@ page's own scripts run, so the proxy injects a script tag for it before `</head>
 `Content-Length` because the body it sends is not the body it received. Everything else — paths, methods,
 status codes, the page's own headers — passes through unchanged.
 
-## Open implementation questions
+## Bridge request and error behavior
 
-1. **The bridge's method-level error mapping.** Which failure code each bridge call answers when the
-   host cannot serve it — an unsupported capability, a full queue, a runtime that stopped between two
-   calls — and how a page's request identifier survives the `postMessage` boundary.
+The bridge preserves the page's `requestId` through the `postMessage` request, the host operation
+and the response or event, so concurrent calls settle only the promise that started them. The host
+validates the source frame and its origin before it accepts a request. Malformed payloads answer
+`invalid_request`; a duplicate in-flight request id answers `busy`; a page without a host session
+answers `not_permitted`; and a runtime without the Agent capability answers `runtime_unavailable`.
+For supported calls, the service's documented failure code is preserved. If transport fails after a
+turn or call may have taken effect, the bridge answers `result_unknown` rather than inviting an unsafe
+retry. The shared contract and runtime Agent contract define the accepted failure codes and the
+`busy` reasons (`packages/shared/src/miniapp-surface.ts` and
+`packages/local-runtime-v2/src/service/miniapp/agent/contracts.ts`).
 
 ## Research findings
 

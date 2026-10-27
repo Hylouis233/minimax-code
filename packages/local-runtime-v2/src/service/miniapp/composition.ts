@@ -29,7 +29,6 @@ export interface RuntimeMiniAppServiceOptions {
 
 export function resolveRuntimeMiniAppOptions(
   input: RuntimeMiniAppServiceOptions & {
-    readonly runtimeOwnerKind?: string;
     /** The runtime owner policy's `wiring.miniAppService` cell for this host. */
     readonly miniAppService?: boolean;
   },

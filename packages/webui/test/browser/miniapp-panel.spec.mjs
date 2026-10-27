@@ -137,6 +137,38 @@ test("the launcher's 应用 tile opens the picker and the chosen Mini App is fra
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "miniapp");
 });
 
+test("a Mini App owned by another client reports the refusal and stays unopened here", async ({ page }) => {
+  await configureFixture(page, () => {
+    window.__WEBUI_FIXTURE_SETUP__ ??= [];
+    window.__WEBUI_FIXTURE_SETUP__.push(() => {
+      window.__fixture.setResponse("listMiniApps", { miniApps: [{
+        pluginId: "demo.miniapp",
+        displayName: "演示应用",
+        runtime: { kind: "process", status: "running" },
+      }] });
+      window.__fixture.refuseOperation(
+        "openMiniApp",
+        "OWNED_ELSEWHERE",
+        "Mini App is already running in Desktop",
+      );
+    });
+  });
+  await openApp(page);
+  await openWorkspacePanel(page);
+  await page.getByTestId("workspace-launcher-tile-miniapp").click();
+  await page.getByTestId("miniapp-picker").getByRole("button", { name: "打开" }).click();
+
+  await expect(page.getByTestId("miniapp-picker")).toContainText(
+    "已在其他客户端运行：Mini App is already running in Desktop",
+  );
+  await expect(page.getByTestId("miniapp-view-frame")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      window.__fixture.requests.filter((request) => request.operation === "openMiniApp").length,
+    ),
+  ).toBe(1);
+});
+
 test("a stopped Mini App clears its view and reopens only when the person asks", async ({ page }) => {
   await configureFixture(page, () => {
     window.__WEBUI_FIXTURE_SETUP__ ??= [];
