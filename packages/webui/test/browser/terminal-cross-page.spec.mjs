@@ -6,6 +6,12 @@
 // was no longer listed or watchable anywhere. The Terminal owner now holds that
 // truth, and process lifetime belongs to `disposeProcess` / `disposeAll`.
 //
+// A terminal is opened for a workspace tab, and the runtime records that
+// binding: the tab that asked for the PTY is the tab that finds it again in
+// the roster. Two pages that open the same terminal tab therefore meet the
+// same process, and the panel that goes away releases its watch without
+// ending it.
+//
 // A unit test can prove the owner keeps a record, but only the built client can
 // prove what the row is actually about: that a PTY created while session A was
 // on screen is still listed, still watched and still producing output after the
@@ -32,20 +38,14 @@ const openTerminalTab = async (page) => {
   await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "terminal");
 };
 
-const createTerminal = async (page) => {
-  await page.getByRole("button", { name: "新建终端" }).click();
-  await expect
-    .poll(() => page.evaluate(() => window.__fixture.terminals().length))
-    .toBeGreaterThan(0);
-};
-
 test("a PTY created on one page is listed and watched from another", async ({ page }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);
 
   await openTerminalTab(page);
-  await createTerminal(page);
-
+  // The tab asked the runtime for a terminal, and the runtime made one: the
+  // process belongs to the runtime, not to the tab that opened it.
+  await expect.poll(() => page.evaluate(() => window.__fixture.terminals().length)).toBe(1);
   const created = await page.evaluate(() => window.__fixture.terminals());
   expect(created).toHaveLength(1);
   const { terminalId } = created[0];
@@ -61,7 +61,9 @@ test("a PTY created on one page is listed and watched from another", async ({ pa
   await configureFixture(pageB, () => undefined);
   await openApp(pageB);
   await openTerminalTab(pageB);
-  await expect(pageB.getByTestId("workspace-panel")).toContainText("#1");
+  // The catalogue the runtime answers is the runtime's: it still holds the PTY
+  // the first page opened, and the second page adopts that process rather than
+  // asking for another one.
   await expect
     .poll(() => pageB.evaluate(() => window.__fixture.watchedTerminalIds()))
     .toContain(terminalId);
@@ -84,7 +86,7 @@ test("a PTY created on one page is listed and watched from another", async ({ pa
   expect(await page.evaluate(() => window.__fixture.terminals()[0]?.status)).toBe("running");
 
   // The roster holds exactly the PTY created before the round trip. A fixture
-  // or an owner that re-created on attach would show two tabs here.
+  // or an owner that re-created on attach would show two rows here.
   const final = await page.evaluate(() => window.__fixture.terminals());
   expect(final).toHaveLength(1);
   expect(final[0].terminalId).toBe(terminalId);
@@ -97,15 +99,14 @@ test("a PTY created on one page is listed and watched from another", async ({ pa
   expect(delivered).toBe(1);
 });
 
-test("a watch is released without ending the process, and a disposed PTY does not come back", async ({
+test("a watch is released without ending the process, and an ended PTY does not come back", async ({
   page,
 }) => {
   await configureFixture(page, () => undefined);
   await openApp(page);
 
   await openTerminalTab(page);
-  await createTerminal(page);
-
+  await expect.poll(() => page.evaluate(() => window.__fixture.terminals().length)).toBe(1);
   const { terminalId } = (await page.evaluate(() => window.__fixture.terminals()))[0];
 
   // Closing the panel detaches the watch. The row is about the two halves being
@@ -119,15 +120,16 @@ test("a watch is released without ending the process, and a disposed PTY does no
   expect(stillRunning).toHaveLength(1);
   expect(stillRunning[0].status).toBe("running");
 
-  // An explicit close is the other half: it ends the process, and the roster
-  // loses the row rather than reporting it as exited-but-present.
-  await openTerminalTab(page);
-  await page.locator(".webui-terminal-actions").getByRole("button", { name: "关闭" }).click();
-
-  await expect
-    .poll(() => page.evaluate(() => window.__fixture.terminals().length))
-    .toBe(0);
-  await expect
-    .poll(() => page.evaluate(() => window.__fixture.watchedTerminalIds()))
-    .not.toContain(terminalId);
+  // The other half: the process ends on the runtime's side. The roster keeps
+  // the row, so the client still knows that tab's terminal, and it must not
+  // answer the ending by opening another process for the same tab.
+  const creates = () => page.evaluate(() => window.__fixture.requests.filter(
+    (request) => request.operation === "createTerminal",
+  ).length);
+  const before = await creates();
+  expect(await page.evaluate((id) => window.__fixture.exitTerminal(id), terminalId)).toBe(true);
+  await page.getByTestId("workspace-panel-controls").getByRole("button", { name: "浏览器" }).click();
+  await expect(page.getByTestId("workspace-panel")).toHaveAttribute("data-active-tab", "terminal");
+  await expect.poll(() => page.evaluate(() => window.__fixture.terminals()[0]?.status)).toBe("exited");
+  expect(await creates()).toBe(before);
 });

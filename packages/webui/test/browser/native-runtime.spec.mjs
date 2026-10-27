@@ -71,7 +71,8 @@ test("V04/V06: native PTYs survive another page, reload and a full five-slot ros
   await expect(page.locator(`[data-webui-session-link="${created.session.sessionId}"]`)).toHaveAttribute("data-webui-session-active", "true")
     .catch((error) => { throw new Error(`${error.message}\n${JSON.stringify(wire)}`); });
   await openTerminal(page);
-  await page.getByRole("button", { name: "新建终端" }).click();
+  // The terminal tab asked the runtime for a terminal, and the runtime made
+  // one: there is no separate "create" gesture any more.
   await expect.poll(async () => (await rpc(page, "listTerminals")).length).toBe(1)
     .catch(async (error) => { throw new Error(`${error.message}\n${await page.locator("body").innerText()}`); });
   const [terminal] = await rpc(page, "listTerminals");
@@ -101,9 +102,10 @@ test("V04/V06: native PTYs survive another page, reload and a full five-slot ros
   const latePage = await context.newPage();
   await latePage.goto(url);
   await expect(latePage.locator(`[data-webui-session-link="${created.session.sessionId}"]`)).toHaveAttribute("data-webui-session-active", "true");
-  await openTerminal(latePage);
   const spawned = once(child, "message");
-  await latePage.getByRole("button", { name: "新建终端" }).click();
+  // The terminal tab asks for its terminal as soon as it is open, so the hold
+  // has to be armed before the tab is.
+  await openTerminal(latePage);
   expect((await spawned)[0]).toEqual({ created: true });
   await latePage.close();
   const released = once(child, "message"); child.send("release-create"); await released;

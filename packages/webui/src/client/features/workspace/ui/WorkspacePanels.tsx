@@ -525,7 +525,12 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     terminal.open(host);
     let disposed = false;
     let initialFitFrame: number | undefined;
-    void document.fonts.ready.then(() => {
+    // The grid is measured once the fonts have landed: a measurement taken
+    // against fallback glyphs is a measurement of the wrong grid. The wait
+    // comes from the browser platform, because a panel that reached for
+    // `document` itself would be a panel that could only be placed against a
+    // browser.
+    void dom.whenFontsReady().then(() => {
       if (disposed) return;
       initialFitFrame = requestAnimationFrame(() => {
         if (disposed) return;
@@ -570,7 +575,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     const input = terminal.onData((data) => { if (terminalOwner?.canWrite) void terminalOwner.write(terminalId, data); });
     let disposed = false;
     let initialFitFrame: number | undefined;
-    void document.fonts.ready.then(() => {
+    void dom.whenFontsReady().then(() => {
       if (disposed) return;
       initialFitFrame = requestAnimationFrame(() => {
         if (disposed) return;

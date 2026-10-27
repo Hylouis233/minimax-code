@@ -238,7 +238,11 @@ beforeAll(() => {
     .map((match) => match[1])
     .filter(
       (specifier) =>
-        !specifier.startsWith("katex/") &&
+        // Only the shell's own stylesheets count. A package stylesheet —
+        // `katex/`, and now `@xterm/` — is not the shell's CSS: its rules sit
+        // outside the components layer, so counting them would answer questions
+        // the assertions below never asked.
+        specifier.startsWith(".") &&
         !carved.has(specifier.replace(/^.*\//u, "")),
     )
     .map((specifier) => path.resolve(stylesDir, specifier));
@@ -512,6 +516,9 @@ describe("W0 · stylesheet composition", () => {
     expect(imports).toEqual([
       "./tokens.css",
       "./shell.css",
+      // The terminal's own stylesheet, brought in by the package that owns it
+      // rather than copied into the shell's tree.
+      "@xterm/xterm/css/xterm.css",
       // The shared dropdown surface: the look, the motion and the shape every
       // floating popup in the client shares.
       "./dropdown.css",
