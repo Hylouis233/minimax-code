@@ -144,13 +144,6 @@ function canRun(command: string): boolean {
 
 const HAS_ZIP = canRun("zip");
 const HAS_TAR = canRun("tar");
-/**
- * Windows tar builds (MSYS GNU tar) read the drive-letter colon in an absolute
- * archive path as a `host:file` remote spec and fail with "Cannot connect to
- * C:". GNU tar's `--force-local` keeps the path local; bsdtar (macOS) needs
- * no such flag and does not accept it, so it is added on Windows only.
- */
-const TAR_LOCAL_FLAGS = process.platform === "win32" ? ["--force-local"] : [];
 
 function writeTree(
   name: string,
@@ -186,16 +179,23 @@ function realZip(
   return artifactPath(name);
 }
 
-/** A real tar, or a gzipped one when the name ends in `.tgz`. */
+/** A real tar, or a gzipped one when the name ends in `.tgz`.
+ *
+ * The archive argument is sibling-relative (`../<name>` from the source
+ * directory), not absolute: GNU tar reads the drive-letter colon in an
+ * absolute Windows path as a `host:file` remote spec, and Windows's bsdtar
+ * does not accept the `--force-local` escape hatch. A relative path carries
+ * no colon, so every tar flavour (GNU and bsdtar, all three platforms) takes
+ * it as a plain local file. */
 function realTar(
   name: string,
   members: Readonly<Record<string, string>>,
 ): string {
   const source = writeTree(`${name}-src`, members);
   const args = name.endsWith(".tgz")
-    ? ["czf", artifactPath(name)]
-    : ["cf", artifactPath(name)];
-  execFileSync("tar", [...args, ...TAR_LOCAL_FLAGS, "."], { cwd: source, env: FIXTURE_ENV });
+    ? ["czf", `../${name}`]
+    : ["cf", `../${name}`];
+  execFileSync("tar", [...args, "."], { cwd: source, env: FIXTURE_ENV });
   return artifactPath(name);
 }
 
@@ -773,7 +773,9 @@ describe("workspace archive extraction", () => {
 
 /** A tar containing a symlink, via the CLI (`tar` records typeflag `2`). */
 function realTarLink(name: string, source: string, member: string): string {
-  execFileSync("tar", ["cf", artifactPath(name), ...TAR_LOCAL_FLAGS, member], {
+  // Sibling-relative for the same reason as `realTar`: no drive-letter colon
+  // for GNU tar to mistake for a host, no flag for bsdtar to reject.
+  execFileSync("tar", ["cf", `../${name}`, member], {
     cwd: source,
     env: FIXTURE_ENV,
   });
