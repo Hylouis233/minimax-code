@@ -4,15 +4,35 @@
 
   /* The floating composer card. Same layer as `.webui-card`, at the 20px
    * radius, with the shadow added from `sm` upward. Same reason
-   * as `.webui-hero-avatar` for living here instead of in the markup. */
+   * as `.webui-hero-avatar` for living here instead of in the markup.
+   *
+   * The card is a size container: the toolbar's own form follows the width of
+   * the card it is in, not the width of the window (ADR 0025). */
   .webui-composer-card {
     min-width: 0;
     box-shadow: 0 0 10px 0 var(--shadow_default);
+    container: webui-composer / inline-size;
   }
 
+  /*
+   * The composer's toolbar.
+   *
+   * One row, always.
+   *
+   * The toolbar used to wrap, and whether it wrapped was decided by a
+   * threshold that had nothing to do with what the row needed. At 1024px the
+   * composer's card was 406px — enough for every control — and the model
+   * button and the permission control still ended up on two lines, because
+   * 406px was under a limit set at 419px. The limit was the column's width
+   * wearing the row's clothes.
+   *
+   * The row cannot wrap now. A control that does not fit gives up its text
+   * instead: the model name becomes an icon, and the permission label becomes
+   * a shield (ADR 0025).
+   */
   [data-webui-composer-toolbar] {
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
   [data-webui-composer-toolbar] > * {
@@ -22,8 +42,40 @@
   .webui-composer-toolbar-actions {
     min-width: 0;
     max-width: 100%;
-    flex-wrap: wrap;
+    /* The cluster sits at the right of the toolbar. */
+    margin-left: auto;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+  }
+
+  /*
+   * The permission control's narrow form.
+   *
+   * The permission control is a fixed, unshrinkable label — it cannot
+   * truncate, and it is the reason a single-row toolbar eventually pushes the
+   * send control off the row. Below the stacking threshold it keeps its glyph
+   * and drops its words, and its accessible name and its tooltip keep saying
+   * which mode is in force, so nothing is lost that a reader would have had.
+   *
+   * This is the LAST control to narrow: the model name gives up its text
+   * first, because the model name is the variable-length one and the shield
+   * says less than the words do.
+   */
+  @container webui-composer (max-width: 271px) {
+    .webui-composer-permission-button {
+      width: 32px;
+      justify-content: center;
+      gap: 0;
+      padding: 0;
+    }
+
+    .webui-composer-permission-button .webui-composer-permission-label {
+      display: none;
+    }
+
+    .webui-composer-permission-button .webui-composer-permission-chevron {
+      display: none;
+    }
   }
 
   /* The surface — the background, the border, the radius, the shadow and the

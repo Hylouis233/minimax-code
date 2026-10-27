@@ -16,6 +16,11 @@
 
 @import "./tokens.css";
 @import "./shell.css";
+/* The layout threshold contract (ADR 0025): the widths the client adapts at,
+ * and the shell skeleton's own rules — the conversation column's floor and the
+ * rail's form. It comes before the feature rules so a business that reads one
+ * of its widths finds the property already declared. */
+@import "./layout.css";
 @import "@xterm/xterm/css/xterm.css";
 /* The shared dropdown surface: the look, the motion and the shape every
  * floating popup in the client shares. It comes before the feature rules, so a

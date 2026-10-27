@@ -85,11 +85,13 @@
   @media (max-width: 720px) { .webui-provider-form-provider-grid { grid-template-columns: minmax(0, 1fr); } .webui-provider-form-actions { flex-wrap: wrap; } }
   /* --------------------------------------------------------------- surfaces */
 
-  /* Match the navigation rail while keeping the main surface roomy. */
+  /* Match the navigation rail while keeping the main surface roomy. The rail's
+   * width is the shell skeleton's — it is declared in `client/styles/layout.css`
+   * beside the thresholds it answers to, because the markup used to carry a
+   * second copy of it and only one of the two could win. */
   .webui-rail {
     display: flex;
     flex-direction: column;
-    width: 240px;
     background-color: var(--bg_default_scrim);
     transition: width 180ms cubic-bezier(.2, .7, .2, 1);
   }
@@ -126,6 +128,41 @@
     color: var(--text_default_tertiary);
   }
   .webui-model-selector-trigger [data-ultra="true"] { color: #9b5cff; transition: color 180ms ease; }
+
+  /*
+   * The trigger's narrow form.
+   *
+   * The trigger shows the model's name, and the name is the one variable-length
+   * thing in the composer's toolbar. The composer's row cannot wrap, so below
+   * the composer's threshold the trigger becomes a glyph and the name goes to
+   * the hover affordance (ADR 0025).
+   *
+   * The threshold is the composer's, so the query names the composer's
+   * container. Outside a composer the query simply does not match, and the
+   * trigger keeps its full form.
+   */
+  .webui-model-trigger-icon {
+    display: none;
+  }
+
+  @container webui-composer (max-width: 359px) {
+    .webui-model-selector-trigger {
+      width: 32px;
+      justify-content: center;
+      gap: 0;
+      padding: 0;
+    }
+
+    .webui-model-selector-trigger .webui-model-trigger-label,
+    .webui-model-selector-trigger .webui-model-trigger-chevron,
+    .webui-model-selector-trigger [data-webui-model-chip-level="true"] {
+      display: none;
+    }
+
+    .webui-model-selector-trigger .webui-model-trigger-icon {
+      display: inline-flex;
+    }
+  }
   /* ------------------------------------------------------------- the picker
    *
    * ONE popup with two states: the panel (the model in use and its thinking
@@ -495,21 +532,5 @@
     font-size: var(--size_14);
     line-height: var(--line_height_20);
     text-align: center;
-  }
-
-
-  @media (max-width: 1080px) {
-    .webui-model-menu--two-column {
-      min-width: 0;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    }
-  }
-
-  @media (max-width: 760px) {
-    .webui-model-menu--two-column {
-      width: min(560px, calc(100vw - 32px));
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-    }
   }
 }

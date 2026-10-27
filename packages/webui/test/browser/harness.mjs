@@ -17,6 +17,31 @@ import { expect, test as base } from "@playwright/test";
 /** The suite's `test`, carrying the harness-server guard for every test. */
 export const test = base;
 
+/**
+ * The pixel budget for a screenshot comparison, shared by every spec that
+ * compares a baseline.
+ *
+ * The committed baselines are recorded under the pinned font environment in
+ * `packages/webui/test/browser/fonts/`, so the glyphs are the same on every
+ * machine. What remains is the rasterizer's own rounding at a rounded
+ * corner: a bubble's right edge lands on a fractional pixel, and whether that
+ * edge rounds up or down shifts a handful of antialiased pixels from run to
+ * run. Measured over repeated runs of the browser suite, the widest such
+ * shift is seven pixels on the transcript surface and one on the plugin
+ * management list.
+ *
+ * The budget is therefore seven pixels plus a little headroom, on a capture
+ * of well over a million pixels — under 0.001% of the image. A real layout
+ * change moves orders of magnitude more than that: shifting one bubble edge
+ * by a single pixel already changes nineteen pixels, so the budget cannot
+ * hide a regression. Everything structural is asserted separately by DOM and
+ * geometry checks, which are not subject to this budget.
+ */
+export const PIXEL_BUDGET = { maxDiffPixels: 8 };
+
+/** Screenshot options shared by every baseline comparison. */
+export const screenshotOptions = { animations: "disabled", ...PIXEL_BUDGET };
+
 export async function configureFixture(page, setup) {
   await page.addInitScript({ content: `window.__WEBUI_FIXTURE_SETUP__ ??= []; window.__WEBUI_FIXTURE_SETUP__.push((${setup.toString()}));` });
 }

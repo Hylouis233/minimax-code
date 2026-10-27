@@ -4,7 +4,7 @@ Capabilities the WebUI does not have, verified against the tree. Each entry says
 how, and what remains unverified. "Not implemented" and "not decided" are different states and are
 kept apart here; the undecided ones are also in `open-questions.md`.
 
-Last verified: 2026-10-26, against `webui` at `88c83655`. This list covers capabilities; open
+Last verified: 2026-10-27, against `webui` at `d9593276`. This list covers capabilities; open
 decisions are in [`open-questions.md`](open-questions.md).
 
 ## 1. Connector and App tools depend on a beta feature, and on the model finding them
@@ -171,6 +171,43 @@ The upstream half of this is still open: the fix that stopped the runtime from *
 out-of-workspace file's content was reverted in PR #240 because it changed a package this fork may
 not change, so the content still travels between the runtime and the browser. The client stops it
 from being shown; only the upstream change stops it from being collected.
+
+## 11. The collapsed rail renders no navigation, and the rail's grip does nothing
+
+**Shipped state, not a regression.** Two affordances in the shell look like they do something and
+do not.
+
+- **The collapsed rail is 64px of nothing.** `client/features/sessions/ui/SessionRailRegion.tsx`
+  renders the rail's fixed rows, its scroll area and its project list only when `collapsed` is
+  false. In the collapsed state the aside keeps its 64px width, a 50px spacer and the footer, and
+  no navigation item at all. Collapsing the rail therefore does not replace the navigation with an
+  icon rail — it removes it, and the only way back is the toggle in the session header.
+- **The rail's grip is decoration.** The separator on the rail's edge in
+  `client/shell/WebuiClientFoundationApp.tsx` carries `role="separator"`,
+  `aria-label="Resize navigation"` and a visible grip, but no pointer or keyboard handler. The rail
+  is not resizable.
+
+[ADR 0025](adr/0025-the-layout-adapts-to-available-width.md) keeps both as they are and changes only
+*when* the rail changes form: below 640px it becomes an overlay drawer instead of a column. Giving
+the collapsed state an icon rail, and making the grip real, are each a separate piece of work.
+
+## 12. The progress panel is unavailable below 1080px
+
+**Deliberate, and the card's own doing.** The progress panel is a card that floats over the
+conversation's right edge, and the conversation keeps a 312px gutter for it so the card lands in
+that gutter instead of on top of the text. Below 1080px the conversation cannot spare that gutter
+without being squeezed itself, so the panel closes itself: the card would otherwise float over the
+conversation's corner and cover the messages it is reporting on.
+
+The cost is real and worth stating: **on a window narrower than 1080px there is no progress
+panel at all.** The control in the session header stays in place, marked unavailable and
+explaining why, rather than opening a card that would cover the text. Widening the window past
+1080px brings the control back but does not open the panel by itself — it opens by hand.
+
+The alternative — keeping the card and letting the conversation yield the width — would give the
+panel back at the cost of 312px of reading space on every narrow window. The conversation is the
+thing the client is for, so the panel gives way instead. [ADR 0025](adr/0025-the-layout-adapts-to-available-width.md)
+records the decision.
 
 ## Reported as missing, and actually correct
 

@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "@playwright/test";
 
-import { openApp, test } from "./harness.mjs";
+import { openApp, screenshotOptions, test } from "./harness.mjs";
 
 async function openManagement(page) {
   await openApp(page, "#session=A");
@@ -38,12 +38,14 @@ async function expectCenteredDialog(dialog, page, fieldsSelector) {
     insideViewport: true,
     ...(fieldsSelector ? { fieldsDisplay: "grid" } : {}),
   });
-  await expect(page.locator(".webui-plugin-backdrop")).toHaveScreenshot({ animations: "disabled" });
+  await expect(page.locator(".webui-plugin-backdrop")).toHaveScreenshot(screenshotOptions);
 }
 
 async function expectMobileDialog(dialog, page, fieldsSelector) {
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect.poll(() => page.evaluate(() => matchMedia("(max-width: 760px)").matches)).toBe(true);
+  // The dialog's form follows the dialog's own width, not the width of the
+  // window (ADR 0025). The single-column assertion below is what proves the
+  // narrow tier is in force; there is no viewport breakpoint left to match.
   await expect.poll(() => dialog.evaluate((node) => node.getBoundingClientRect().width)).toBeLessThan(390);
   const layout = await dialog.evaluate((node, fieldsSelector) => {
     const rect = node.getBoundingClientRect();

@@ -11,7 +11,9 @@
 // catalogue hands down is one `onSubmit` that runs a typed intent.
 
 import type { ReactElement } from "react";
+import { createPortal } from "react-dom";
 
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import type { WebuiPluginRow as Row } from "../contracts/plugin-rows.js";
 import type { WebuiPluginIntent } from "../contracts/plugin-actions.js";
 import { McpServerForm } from "./McpServerForm.js";
@@ -40,7 +42,9 @@ export function PluginItemDialog({
   onChatWithAgent,
   onClose,
 }: PluginItemDialogProps): ReactElement {
-  return (
+  const { dom } = useWebuiBrowserCapabilities();
+  const portalTarget = dom.portalTarget();
+  const surface = (
     <div
       className="webui-plugin-backdrop"
       onMouseDown={(event) => {
@@ -78,4 +82,9 @@ export function PluginItemDialog({
       </div>
     </div>
   );
+  // The dialog is portalled out of the plugin page rather than drawn inside
+  // it, so that the page can be a size container: a container confines the
+  // fixed-position descendants inside it, and this dialog's scrim is meant to
+  // cover the whole viewport rather than the page (ADR 0025).
+  return portalTarget ? createPortal(surface, portalTarget) : surface;
 }

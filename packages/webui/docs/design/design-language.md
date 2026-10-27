@@ -109,6 +109,77 @@ styled with the same names the token file declares.
   re-authors is a control that drifts, and the first drift of a border was four cards that read as
   four separate products inside one section.
 
+### Responsive layout
+
+The layout adapts to **the width it has**, not to the width of the window. The decision and its
+reasoning are in [ADR 0025](../adr/0025-the-layout-adapts-to-available-width.md); this is the working
+contract.
+
+- **The surface's width is a budget.** The conversation column keeps a floor and the tool regions
+  give way instead. A region that cannot have the width it wants changes form — a column into an
+  overlay, a full label into an icon — and it never reserves layout width it is not using.
+- **The stylesheet owns every form; a measurement selects which form applies.** The shell measures
+  its main surface and reports the form; the stylesheet holds the rules for what each form looks
+  like. JavaScript reports the measurement and clamps the number, and never decides what a form
+  looks like — a resize handler that also decides whether a panel is a column or an overlay creates
+  a second judge for the same question, and the two drift. Whether a panel is *open* is a
+  different question from what it looks like: the progress panel's card is entirely the
+  stylesheet's, and the client decides only whether the window has room for it.
+- **A shape change is driven by the box the element is in.** A component that changes shape asks
+  its own container how wide it is — the composer toolbar asks the composer card, the panel's file
+  tree asks the panel, a page that is laid out inside the surface asks the surface. A viewport
+  breakpoint measures the window, which is not what these elements spend.
+- **An overlay reserves no width it is not using.** A floating panel that *also* takes a gutter out
+  of its sibling is claiming space twice: it covers the content and narrows it. A drawer is out of
+  the flow, a closed panel is zero wide, and a column takes the width it actually uses. The
+  progress panel's card is the one float that keeps a gutter, and that gutter is the card's own
+  room — which is why the card closes itself where there is none.
+- **Two pieces of geometry that describe one relationship are derived from one number.** The rail's
+  toggle and the session title were two literals for one gap; they are now two children of one
+  row, so they cannot disagree.
+- **A viewport-anchored overlay keeps its viewport breakpoints.** The settings modal is a `100vw`
+  takeover and the model menu, the composer's menus and the provider form are fixed popups placed
+  against the window: the viewport is the box they are placed against, so the viewport is the width
+  they have.
+- **A container confines the fixed-position descendants inside it.** A page that hosts a
+  viewport-covering dialog cannot be a size container, because the dialog's scrim would be clipped
+  to the page. Portalling that dialog out is what lets the page follow its own width.
+- **The viewport-level breakpoints are the two that belong to the window itself.** Below 640px the
+  left rail becomes an overlay drawer instead of a column, and below 1080px the progress panel's
+  card closes itself rather than sit on the conversation. Nothing else in the client breaks on a
+  viewport width.
+- **The thresholds are one contract**, shared by the stylesheet and the resize logic:
+
+  | Name | Width | Decides |
+  | --- | --- | --- |
+  | `shellCompact` | 640px | the rail's form |
+  | `conversationMin` | 320px | the conversation column's floor |
+  | `surfaceSplit` | 680px | the workspace panel's form |
+  | `panelMin` | 360px | the workspace panel's floor |
+  | `panelOverlayMax` | 560px | the workspace panel's overlay width |
+  | `composerModelIcon` | 360px | the composer toolbar's model name → icon |
+  | `composerPermissionIcon` | 272px | the composer toolbar's permission label → shield |
+  | `progressPanelMinWidth` | 1080px | whether the progress panel may be open |
+
+- **A split threshold is a sum, not a preference.** `surfaceSplit` is
+  `conversationMin + panelMin`. A derived number cannot drift from the thing it was derived from,
+  and a unit test asserts the sum. `progressPanelMinWidth` is the one threshold that is not a sum:
+  the conversation could spare the card's gutter further down, but the panel closes itself instead,
+  because the conversation is the thing the client is for.
+- **A threshold is the smallest width at which the full form applies.** The narrow form's condition
+  is therefore written one pixel below it — `360px` is `max-width: 359px` — and the unit test
+  derives that complement from the threshold, so the two cannot drift apart.
+- **A query condition cannot use `var()`.** The thresholds are literals in the query conditions and
+  constants in `client/ui/layout-thresholds.ts`, and a unit test asserts the two agree. A threshold
+  that appears only in a stylesheet is invisible to the code that has to clamp against it.
+- **A column needs a floor.** `min-width: 0` on a flex child means its content may be clipped to
+  nothing. It is legitimate where a parent's floor already guarantees the space, and it is the
+  defect this contract removes where the column has no floor of its own.
+- **The zones degrade differently.** The conversation region keeps its text readable — it truncates
+  and wraps and never loses its floor. The tool regions keep their controls reachable — they
+  scroll, collapse into an icon, or become a drawer. One rule for both would produce an
+  unreadable reading surface or an unusable tool surface.
+
 ## Styling rules
 
 - **One stylesheet.** `src/client/styles/index.css` is the only compiled entry; every other

@@ -8,6 +8,7 @@ import {
   emitAgentMessage,
   emitStream,
   openApp,
+  screenshotOptions,
   startTurn,
   test,
 } from "./harness.mjs";
@@ -36,7 +37,7 @@ test("shell and session rail layout baseline", async ({ page }) => {
   await expect.poll(() => page.locator('img[src^="/assets/"]').evaluateAll((images) =>
     images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
   )).toBe(true);
-  await expect(shell).toHaveScreenshot("shell-and-rail.png", { animations: "disabled" });
+  await expect(shell).toHaveScreenshot("shell-and-rail.png", screenshotOptions);
 });
 
 test("transcript and composer layout baseline", async ({ page }) => {
@@ -83,7 +84,7 @@ test("transcript and composer layout baseline", async ({ page }) => {
   const transcript = page.locator('[data-webui-transcript="A"]');
   await assertInViewport(transcript, page);
   await expect(page.getByPlaceholder("输入消息…（输入 / 唤起命令）")).toBeVisible();
-  await expect(page.locator("#webui-root")).toHaveScreenshot("transcript-and-composer.png", { animations: "disabled" });
+  await expect(page.locator("#webui-root")).toHaveScreenshot("transcript-and-composer.png", screenshotOptions);
 });
 
 test("settings dialog layout baseline", async ({ page }) => {
@@ -105,7 +106,7 @@ test("settings dialog layout baseline", async ({ page }) => {
     });
     await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
   });
-  await expect(dialog).toHaveScreenshot("settings-dialog.png", { animations: "disabled" });
+  await expect(dialog).toHaveScreenshot("settings-dialog.png", screenshotOptions);
 });
 
 test("progress panel layout baseline", async ({ page }) => {
@@ -130,7 +131,7 @@ test("progress panel layout baseline", async ({ page }) => {
   const panel = page.getByTestId("progress-overview-panel");
   await expect(panel).toContainText("Synthetic visual todo");
   await assertInViewport(panel, page);
-  await expect(panel).toHaveScreenshot("progress-panel.png", { animations: "disabled" });
+  await expect(panel).toHaveScreenshot("progress-panel.png", screenshotOptions);
 });
 
 test("embedded browser panel layout baseline", async ({ page }) => {
@@ -144,7 +145,7 @@ test("embedded browser panel layout baseline", async ({ page }) => {
   });
   await assertInViewport(panel, page);
   await expect(page.getByTestId("workspace-launcher")).toBeVisible();
-  await expect(panel).toHaveScreenshot("embedded-browser-panel.png", { animations: "disabled" });
+  await expect(panel).toHaveScreenshot("embedded-browser-panel.png", screenshotOptions);
 });
 
 test("composer command overlay layout baseline", async ({ page }) => {
@@ -156,7 +157,7 @@ test("composer command overlay layout baseline", async ({ page }) => {
   const overlay = page.locator('[data-webui-command-menu="true"]');
   await expect(overlay).toBeVisible();
   await assertInViewport(overlay, page);
-  await expect(overlay).toHaveScreenshot("composer-command-overlay.png", { animations: "disabled" });
+  await expect(overlay).toHaveScreenshot("composer-command-overlay.png", screenshotOptions);
 });
 
 test("plugin marketplace and skills catalogue layout baselines", async ({ page }) => {
@@ -188,12 +189,12 @@ test("plugin marketplace and skills catalogue layout baselines", async ({ page }
   const grid = await pluginGrid.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
   expect(grid).toBe(2);
   await assertInViewport(pluginGrid, page);
-  await expect(surface).toHaveScreenshot("plugin-marketplace.png", { animations: "disabled" });
+  await expect(surface).toHaveScreenshot("plugin-marketplace.png", screenshotOptions);
 
   await surface.getByRole("button", { name: "技能", exact: true }).click();
   await expect(surface.locator(".webui-plugin-grid .webui-plugin-row")).toHaveCount(2);
   await expect(surface.getByText("Release notes")).toBeVisible();
-  await expect(surface).toHaveScreenshot("skill-marketplace.png", { animations: "disabled" });
+  await expect(surface).toHaveScreenshot("skill-marketplace.png", screenshotOptions);
 });
 
 test("plugin management skill and MCP rows layout baselines", async ({ page }) => {
@@ -223,10 +224,10 @@ test("plugin management skill and MCP rows layout baselines", async ({ page }) =
   await expect(surface.getByText("Local checklist")).toBeVisible();
   await expect(surface.getByLabel("启用 disabled-review")).toBeVisible();
   await assertInViewport(surface.locator(".webui-plugin-list"), page);
-  await expect(surface).toHaveScreenshot("skill-management.png", { animations: "disabled" });
+  await expect(surface).toHaveScreenshot("skill-management.png", screenshotOptions);
 
   await surface.locator('.webui-plugin-category-filter button', { hasText: "MCP" }).click();
   await expect(surface.getByText("已连接")).toBeVisible();
   await expect(surface.getByText("MCP_COMMAND_NOT_FOUND: synthetic")).toBeVisible();
-  await expect(surface).toHaveScreenshot("mcp-management.png", { animations: "disabled" });
+  await expect(surface).toHaveScreenshot("mcp-management.png", screenshotOptions);
 });

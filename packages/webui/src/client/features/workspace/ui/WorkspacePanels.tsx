@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { IconEdit } from "@tabler/icons-react";
 import { FitAddon } from "@xterm/addon-fit";
 import { basenamePath } from "../../../projection/common/paths.js";
+import { webuiPanelWidthBounds, webuiSurfaceTier, type WebuiSurfaceTier } from "../../../ui/layout-thresholds.js";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -211,14 +212,30 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
 }): ReactElement {
   const browserPort = useWebuiPortSlice("browser");
   const [panelWidth, setPanelWidth] = useState<number>();
-  const [panelCovering, setPanelCovering] = useState(false);
   const [panelClosing, setPanelClosing] = useState(false);
   const [expansionMotion, setExpansionMotion] = useState<"expanding" | "collapsing">();
+  /**
+   * The tier this panel takes on the surface it shares with the conversation
+   * column (ADR 0025).
+   *
+   * The tier is measured rather than queried: the surface is not the window,
+   * because the navigation rail takes its share of the window first, and a
+   * panel that sized itself against the window is what let the conversation
+   * column be squeezed to nothing. The panel reports the tier on itself and
+   * the stylesheet owns what each tier looks like.
+   */
+  const [surfaceTier, setSurfaceTier] = useState<WebuiSurfaceTier>("split");
   const panelStateRef = useRef(state);
   panelStateRef.current = state;
   const panelClosingRef = useRef(false);
   const pendingPanelClose = useRef<WorkspacePanelCommand | undefined>(undefined);
   const resizeGesture = useRef<{ readonly pointerId: number; readonly startX: number; readonly startWidth: number } | undefined>(undefined);
+  const panelRef = useRef<HTMLElement | null>(null);
+  /** The surface's width, read by the drag without a re-render on every frame. */
+  const surfaceWidthRef = useRef<number>();
+  /** The width the person asked for, read the same way. */
+  const panelWidthRef = useRef<number>();
+  panelWidthRef.current = panelWidth;
   const { dom } = useWebuiBrowserCapabilities();
   // Query truth lives in the owner; this component reads its snapshot and
   // submits query commands. Display state — active tab, expansion, search box,
@@ -250,6 +267,50 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   );
   const browserTab = activeWebTab ?? retainedWebTab;
   const tab = activeTab?.content.kind ?? "files";
+  /**
+   * The surface measurement.
+   *
+   * `useLayoutEffect` rather than `useEffect`: the tier decides whether the
+   * panel is a column beside the conversation or an overlay over it, and the
+   * measurement has to land before the first paint or the panel is drawn in
+   * the wrong form for a frame.
+   *
+   * The observer is also what re-clamps the width. A window that narrows after
+   * a drag never moves the pointer, so a clamp that only ran while the pointer
+   * moved left the panel holding a width the conversation could not afford.
+   */
+  useLayoutEffect(() => {
+    const surface = panelRef.current?.parentElement;
+    if (!surface) return;
+    const measure = (width: number): void => {
+      surfaceWidthRef.current = width;
+      const tier = webuiSurfaceTier(width);
+      setSurfaceTier((current) => (current === tier ? current : tier));
+      const desired = panelWidthRef.current;
+      if (desired === undefined) return;
+      const bounds = webuiPanelWidthBounds(width);
+      if (desired > bounds.max) setPanelWidth(Math.max(bounds.min, bounds.max));
+    };
+    measure(surface.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      measure(entry.contentRect.width);
+    });
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
+  /**
+   * A degradation discards the width the person set.
+   *
+   * The panel gives the space back to the conversation column, and widening the
+   * window again does not take it back: a panel that silently reclaimed the
+   * space the conversation is using would be the same squeeze in a later form.
+   */
+  useEffect(() => {
+    if (surfaceTier === "overlay") setPanelWidth(undefined);
+  }, [surfaceTier]);
   const fileTreeScrollRef = useRef<HTMLDivElement>(null);
   const autoNavigationRequests = useRef(new Set<string>());
   const [fileSearch, setFileSearch] = useState("");
@@ -596,7 +657,9 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   // the new tab page took the place of this panel's add menu, which was the same
   // four kinds behind a dropdown.
   const startPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (state.expanded || event.button !== 0) return;
+    // The overlay's width belongs to the stylesheet, so there is nothing to
+    // drag; the panel's own form is not the drag's business.
+    if (state.expanded || surfaceTier !== "split" || event.button !== 0) return;
     event.preventDefault();
     const panel = event.currentTarget.parentElement;
     if (!panel) return;
@@ -606,12 +669,15 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
   const movePanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = resizeGesture.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
-    const parentWidth = event.currentTarget.parentElement?.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
-    const maxWidth = Math.max(1, parentWidth);
-    const minWidth = Math.min(360, maxWidth);
-    const requestedWidth = Math.min(maxWidth, Math.max(minWidth, gesture.startWidth - (event.clientX - gesture.startX)));
+    const surfaceWidth = surfaceWidthRef.current
+      ?? event.currentTarget.parentElement?.parentElement?.getBoundingClientRect().width
+      ?? window.innerWidth;
+    // The panel may claim the surface's width less the conversation column's
+    // floor, and no more. A floor that did not subtract the conversation's
+    // share is what let the conversation be squeezed to nothing.
+    const bounds = webuiPanelWidthBounds(surfaceWidth);
+    const requestedWidth = Math.min(bounds.max, Math.max(bounds.min, gesture.startWidth - (event.clientX - gesture.startX)));
     setPanelWidth(requestedWidth);
-    setPanelCovering(requestedWidth >= parentWidth - 1);
   };
   const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (resizeGesture.current?.pointerId !== event.pointerId) return;
@@ -619,15 +685,16 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const nudgePanelResize = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (state.expanded || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+    if (state.expanded || surfaceTier !== "split" || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
     event.preventDefault();
     const panel = event.currentTarget.parentElement;
-    const parentWidth = panel?.parentElement?.getBoundingClientRect().width ?? window.innerWidth;
-    const currentWidth = panel?.getBoundingClientRect().width ?? parentWidth / 2;
-    const maxWidth = Math.max(1, parentWidth);
-    const requestedWidth = Math.min(maxWidth, Math.max(Math.min(360, maxWidth), currentWidth + (event.key === "ArrowLeft" ? 24 : -24)));
+    const surfaceWidth = surfaceWidthRef.current
+      ?? panel?.parentElement?.getBoundingClientRect().width
+      ?? window.innerWidth;
+    const currentWidth = panel?.getBoundingClientRect().width ?? surfaceWidth / 2;
+    const bounds = webuiPanelWidthBounds(surfaceWidth);
+    const requestedWidth = Math.min(bounds.max, Math.max(bounds.min, currentWidth + (event.key === "ArrowLeft" ? 24 : -24)));
     setPanelWidth(requestedWidth);
-    setPanelCovering(requestedWidth >= parentWidth - 1);
   };
   const handlePanelAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;
@@ -656,7 +723,7 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
     setExpansionMotion(state.expanded ? "collapsing" : "expanding");
     dispatch({ type: "toggle-expanded" });
   };
-  return <aside className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelCovering && !state.expanded ? "is-covering" : ""} ${panelClosing ? "is-closing" : ""} ${expansionMotion ? `is-${expansionMotion}` : ""}`} onAnimationEnd={handlePanelAnimationEnd} style={panelWidth !== undefined && !state.expanded && !panelCovering ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab}>
+  return <aside ref={panelRef} className={`webui-workspace-panel ${state.expanded ? "is-expanded" : ""} ${panelClosing ? "is-closing" : ""} ${expansionMotion ? `is-${expansionMotion}` : ""}`} onAnimationEnd={handlePanelAnimationEnd} style={panelWidth !== undefined && !state.expanded && surfaceTier === "split" ? { width: `${panelWidth}px`, flex: `0 0 ${panelWidth}px` } : undefined} data-testid="workspace-panel" data-active-tab={tab} data-webui-surface-tier={surfaceTier}>
     <div className="webui-workspace-panel-resize-handle" role="separator" aria-label="调整工作区面板宽度" aria-orientation="vertical" aria-valuenow={Math.round(panelWidth ?? 50)} tabIndex={state.expanded ? -1 : 0} onPointerDown={startPanelResize} onPointerMove={movePanelResize} onPointerUp={stopPanelResize} onPointerCancel={stopPanelResize} onKeyDown={nudgePanelResize} />
     <div className="webui-workspace-panel-header">
       <div className="webui-workspace-tabs" role="tablist" aria-label="工作区面板标签">

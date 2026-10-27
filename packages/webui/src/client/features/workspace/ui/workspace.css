@@ -177,10 +177,52 @@
   }
 
   /* Workspace panel, progress overview and workspace review surfaces. */
-  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: 0; min-height: 0; flex: 0 1 50%; flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-expanded, .webui-workspace-panel.is-covering { position: absolute; inset: 0; z-index: 70; width: auto; flex: none; }
+  /*
+   * The panel has two forms, and the form is chosen by the surface's tier
+   * rather than by a viewport breakpoint (ADR 0025). The panel measures the
+   * surface it shares with the conversation column and reports the tier on
+   * itself; the stylesheet owns what each form looks like.
+   *
+   * The base is the column form: the panel beside the conversation. The
+   * overlay form overrides it when the surface cannot hold both the panel's
+   * floor and the conversation column's floor.
+   *
+   * `max-width` is the shell's guarantee and not the resize logic's: the
+   * panel can never claim the space the conversation column needs, so a width
+   * that arrives by any route — a drag, a stale value, a restored session —
+   * cannot squeeze the conversation to nothing.
+   */
+  .webui-workspace-panel { position: relative; display: flex; width: 50%; min-width: var(--webui-panel-min); min-height: 0; flex: 0 1 50%; max-width: calc(100% - var(--webui-conversation-min)); flex-direction: column; overflow: hidden; scrollbar-gutter: auto; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); color: var(--text_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; container: webui-workspace-panel / inline-size; }
+
+  /* The progress panel's gutter.
+   *
+   * The panel is a card that floats over the conversation's right edge, so the
+   * conversation keeps a gutter for it and the card lands in that gutter
+   * instead of on top of the text. The card is anchored to the window rather
+   * than to the surface, so the gutter is measured against the window too.
+   */
+  .webui-session-has-progress-panel { box-sizing: border-box; padding-right: 312px; }
+
+  /* Below this width the conversation cannot spare the gutter, and the panel
+   * closes itself rather than floating over the conversation's corner and
+   * covering the text. This rule is the backstop for that decision: the panel
+   * is not open at these widths, so the gutter is not there either — and if it
+   * ever were, the conversation keeps its full width rather than being
+   * squeezed to make room for a card.
+   *
+   * 1079 is one pixel below the contract's `progressPanelMinWidth`, which is
+   * the convention the composer's own narrow forms use as well. */
+  @media (max-width: 1079px) {
+    .webui-session-has-progress-panel {
+      padding-right: 0;
+    }
+  }
+
+  .webui-workspace-panel[data-webui-surface-tier="overlay"]:not(.is-expanded) { position: absolute; inset: 0 0 0 auto; width: min(100%, var(--webui-panel-overlay-max)); max-width: none; flex: none; z-index: 40; }
+  /* The overlay's width belongs to the stylesheet, so there is nothing to drag. */
+  .webui-workspace-panel[data-webui-surface-tier="overlay"] .webui-workspace-panel-resize-handle { display: none; }
+  .webui-workspace-panel.is-expanded { position: absolute; inset: 0; z-index: 70; width: auto; max-width: none; flex: none; }
   .webui-workspace-panel.is-expanded { animation: webui-workspace-panel-expand 180ms cubic-bezier(.2, .7, .2, 1) both; }
-  .webui-workspace-panel.is-covering:not(.is-expanded) { animation: none; }
   .webui-workspace-panel.is-expanding { animation: webui-workspace-panel-expand 180ms cubic-bezier(.2, .7, .2, 1) both; }
   .webui-workspace-panel.is-collapsing { animation: webui-workspace-panel-collapse 180ms cubic-bezier(.2, .7, .2, 1) both; }
   .webui-workspace-panel.is-closing { pointer-events: none; animation: webui-workspace-panel-exit 180ms cubic-bezier(.2, .7, .2, 1) both; }
@@ -190,8 +232,14 @@
   .webui-workspace-panel.is-expanded .webui-workspace-file-tree-panel { width: min(360px, 34vw); flex-basis: min(360px, 34vw); }
   /* The panel grows from the right edge just like the navigation rail grows
    * from its fixed edge. Width is composited by layout without the expensive
-   * clip-path redraw that made the old top-to-bottom reveal stutter. */
-  .webui-session-has-progress-panel { box-sizing: border-box; padding-right: 312px; }
+   * clip-path redraw that made the old top-to-bottom reveal stutter.
+   *
+   * The reserved gutter is the floating progress panel's own width plus its
+   * offset, read from one place rather than restated here — a reservation that
+   * no longer matches the panel it reserves room for is a panel that either
+   * overlaps the text or steals space it does not need. The panel is capped
+   * by what the surface can afford, so the gutter and the panel cannot
+   * disagree about how much room there is. */
 
   @keyframes webui-workspace-panel-expand { from { opacity: .88; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes webui-workspace-panel-collapse { from { opacity: .88; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
@@ -260,7 +308,7 @@
   .webui-workspace-edit-action:not(:disabled):hover { background: var(--bg_interaction_tertiary_hover); }
   .webui-workspace-tree-toggle { display: inline-flex; width: 34px; height: 34px; flex: 0 0 34px; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--icon_default_secondary); }
   .webui-workspace-tree-toggle:hover, .webui-workspace-tree-toggle[aria-pressed="true"] { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
-  .webui-workspace-file-tree-panel { display: flex; width: clamp(232px, 24vw, 288px); flex: 0 0 clamp(232px, 24vw, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
+  .webui-workspace-file-tree-panel { display: flex; width: clamp(200px, 38cqi, 288px); flex: 0 0 clamp(200px, 38cqi, 288px); min-height: 0; flex-direction: column; border-left: 1px solid var(--border_default); background: var(--bg_default_primary); animation: webui-panel-enter-right 180ms cubic-bezier(.2, .7, .2, 1) both; }
   .webui-workspace-file-search { display: flex; height: 40px; flex: 0 0 40px; align-items: center; gap: var(--spacing_8); margin: var(--spacing_8) var(--spacing_12); border: 1px solid var(--border_default); border-radius: 10px; padding: 0 var(--spacing_8); color: var(--icon_default_tertiary); }
   .webui-workspace-file-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-workspace-file-search input::placeholder { color: var(--text_default_tertiary); }
@@ -360,10 +408,21 @@
   .webui-workspace-review-search button { flex: 0 0 auto; border: 1px solid var(--border_default); border-radius: var(--radius_8); background: var(--bg_default_primary); padding: 0 var(--spacing_12); color: var(--text_default_primary); font-size: var(--size_14); }
   .webui-file-preview-line-active { display: inline-block; width: 100%; background: var(--bg_interaction_tertiary_selected); }
 
-  .webui-workspace-panel-controls { position: absolute; top: 16px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; }
+  /* The panel controls live in the session header row now.
+   *
+   * They used to float over the conversation's top-right corner on their own,
+   * which is another pair of coordinates that had to agree with something
+   * else — the header the conversation has no part in. In the header row they
+   * are simply the last thing in it (ADR 0025). */
+  .webui-workspace-panel-controls { position: static; display: flex; align-items: center; gap: 4px; }
   .webui-workspace-icon-button { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: transparent; color: var(--icon_default_secondary); }
   .webui-workspace-icon-button:not(:disabled):hover, .webui-workspace-icon-button.is-active { background: var(--bg_interaction_tertiary_selected); color: var(--icon_default_primary); }
   .webui-workspace-icon-button:disabled { cursor: default; opacity: .72; }
+  /* The progress toggle is unavailable while the window is too narrow for the
+   * card to have a gutter of its own. It keeps its place in the row and says
+   * why, so the control does not vanish and leave a gap nobody explains. */
+  .webui-workspace-icon-button[aria-disabled="true"] { cursor: default; opacity: .72; }
+  .webui-workspace-icon-button[aria-disabled="true"]:hover { background: transparent; color: var(--icon_default_secondary); }
   .webui-workspace-panel-close { display: flex; width: 32px; height: 32px; flex: 0 0 32px; align-items: center; justify-content: center; border: 0; border-radius: var(--radius_8); background: transparent; color: var(--icon_default_tertiary); }
   .webui-workspace-panel-close:hover { background: var(--bg_interaction_tertiary_hover); color: var(--icon_default_primary); }
 
@@ -390,29 +449,17 @@
 
   /* Keep the existing surfaces fluid as the browser window narrows.
    * These rules change only available space and panel placement; typography,
-   * colors, radii and component styling continue to come from the same tokens. */
-  @media (max-width: 1080px) {
-    .webui-session-has-progress-panel {
-      padding-right: 0;
-    }
-
-    .webui-workspace-panel {
-      position: absolute;
-      inset: 0 0 0 auto;
-      width: min(50%, 560px);
-      flex: 0 1 min(50%, 560px);
-      z-index: 40;
-    }
-
-    .webui-workspace-panel.is-expanded {
-      width: 100%;
-      flex-basis: 100%;
-    }
-
+   * colors, radii and component styling continue to come from the same tokens.
+   *
+   * The panel's own form is chosen by its surface's tier (ADR 0025) rather than
+   * by a viewport width, so there is no viewport breakpoint here any more. What
+   * is left is the panel's interior: the file tree is a column of its own
+   * inside the panel, and it is the panel's width — not the window's — that
+   * decides whether the tree or the document it serves has the room. */
+  @container webui-workspace-panel (max-width: 520px) {
     .webui-workspace-file-tree-panel {
-      width: clamp(180px, 24vw, 260px);
-      flex-basis: clamp(180px, 24vw, 260px);
+      width: 180px;
+      flex-basis: 180px;
     }
-
   }
 }

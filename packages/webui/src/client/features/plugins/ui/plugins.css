@@ -27,6 +27,11 @@
      * open an unpainted band above the pinned bar for rows to scroll through. */
     padding: 0 24px 48px;
     color: var(--text_default_primary);
+    /* The page is inside the surface, not beside it, so the width it has is
+     * the width the surface has — which is not the width of the window, and
+     * which changes when the navigation rail does. The page's own layout
+     * follows it (ADR 0025). */
+    container: webui-plugin-management / inline-size;
   }
   .webui-plugin-management::-webkit-scrollbar {
     display: none;
@@ -760,6 +765,10 @@
     border-radius: 20px;
     background: var(--bg_default_primary);
     box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+    /* The dialog is placed against the window, so the window is what decides
+     * how much room it has — and the form inside it follows the dialog's own
+     * width rather than the page's (ADR 0025). */
+    container: webui-plugin-dialog / inline-size;
   }
   .webui-plugin-dialog > header {
     display: flex;
@@ -961,7 +970,12 @@
   .webui-mcp-dialog footer {
     padding: 16px 30px 24px;
   }
-  @media (max-width: 760px) {
+  /* The plugin page's own width decides its layout, not the width of the
+   * window. The threshold is the surface's width at the point the page used
+   * to switch: the page sits beside a 240px navigation rail, so a 760px
+   * window left the page 520px, and the page's own grid has to answer to
+   * that number whether it arrived by a narrow window or a collapsed rail. */
+  @container webui-plugin-management (max-width: 520px) {
     .webui-plugin-management {
       /* No top padding here either: the sticky header owns it, and a
        * padding-top would show rows through the gap above the pinned bar. */
@@ -979,6 +993,18 @@
     .webui-plugin-market-skill-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+  }
+
+  /*
+   * The dialog's own width decides its form.
+   *
+   * The dialog is portalled out of the plugin page, so the page's container
+   * cannot answer for it — and it should not: the dialog is placed against
+   * the window, and the width it has is the width it was given. Two columns of
+   * form need room for a readable control in each, so below the threshold the
+   * forms stack.
+   */
+  @container webui-plugin-dialog (max-width: 620px) {
     .webui-agent-editor {
       grid-template-columns: 1fr;
       min-height: 0;

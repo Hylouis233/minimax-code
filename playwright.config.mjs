@@ -1,8 +1,26 @@
 import { defineConfig } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
+import { prepareFontEnvironment } from "./scripts/lib/webui-font-environment.mjs";
+
+const root = fileURLToPath(new URL(".", import.meta.url));
 const serverId = process.env.WEBUI_BROWSER_SERVER_ID ?? randomUUID();
 process.env.WEBUI_BROWSER_SERVER_ID = serverId;
+
+// The visual baselines compare pixels, so the glyphs they draw have to be the
+// same on every machine. The host's installed fonts are not: the CI image
+// changes, the gate's browser dependency install pulls a different font
+// package set over time, and the host's fontconfig decides between LCD
+// subpixel fringes and grayscale antialiasing. The browser therefore runs
+// under a fontconfig that exposes only the font files committed to
+// `packages/webui/test/browser/fonts/`, so the rendering depends on this
+// repository and on nothing else.
+const outputDirectory =
+  process.env.WEBUI_BROWSER_OUTPUT_DIR ?? "/tmp/minimax-webui-browser-results";
+const fontEnvironment = prepareFontEnvironment(root, {
+  cacheDirectory: outputDirectory,
+});
 
 // `reuseExistingServer` is opt-in. Playwright only probes the url for
 // reachability, so reusing by default meant that *any* process answering on the
@@ -16,7 +34,7 @@ const reuseExistingServer = !process.env.CI && process.env.WEBUI_BROWSER_REUSE =
 
 export default defineConfig({
   testDir: "./packages/webui/test/browser",
-  outputDir: process.env.WEBUI_BROWSER_OUTPUT_DIR ?? "/tmp/minimax-webui-browser-results",
+  outputDir: outputDirectory,
   fullyParallel: false,
   workers: 1,
   reporter: "list",
@@ -32,6 +50,9 @@ export default defineConfig({
     browserName: "chromium",
     headless: true,
     trace: "retain-on-failure",
+    launchOptions: {
+      env: { ...process.env, ...fontEnvironment.env },
+    },
   },
   webServer: {
     command: "node packages/webui/test/browser/server.mjs",

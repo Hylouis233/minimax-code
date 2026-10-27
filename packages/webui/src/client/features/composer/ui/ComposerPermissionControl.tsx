@@ -107,11 +107,18 @@ export function WebuiComposerPermissionControl({
           className={`webui-composer-permission-button${mode === "bypassPermissions" ? " webui-composer-permission-button--warning" : ""}`}
           aria-label={mode ? `授权模式：${PERMISSION_MODE_OPTION[mode].label}` : "授权模式"}
           disabled={unavailable || busy || !mode}
-          title={unavailable ? "授权模式当前不可用" : undefined}
+          // The control drops its words when the composer is narrow and keeps a
+          // shield instead, so the hover affordance has to carry the mode's
+          // name (ADR 0025).
+          title={unavailable
+            ? "授权模式当前不可用"
+            : mode
+              ? `授权模式：${PERMISSION_MODE_OPTION[mode].label}`
+              : undefined}
           data-testid="composer-permission-mode"
         >
           {mode ? <PermissionModeIcon mode={mode} /> : <WebuiIconPermissionRequest className="webui-composer-permission-icon" />}
-          <span>{mode ? PERMISSION_MODE_OPTION[mode].label : unavailable ? "授权不可用" : "读取授权模式…"}</span>
+          <span className="webui-composer-permission-label">{mode ? PERMISSION_MODE_OPTION[mode].label : unavailable ? "授权不可用" : "读取授权模式…"}</span>
           <WebuiIconChevronDown className="webui-composer-permission-chevron" />
         </button>
       )}

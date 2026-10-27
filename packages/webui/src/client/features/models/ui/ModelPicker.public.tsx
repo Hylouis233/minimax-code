@@ -35,7 +35,7 @@ import {
   type ReactElement,
 } from "react";
 
-import { WebuiIconChevronDown } from "../../../shell/icons.js";
+import { WebuiIconChevronDown, WebuiIconModel } from "../../../shell/icons.js";
 import { WebuiDropdown } from "../../../ui/Dropdown.js";
 import type {
   WebuiModelPickerDraft,
@@ -319,9 +319,16 @@ export function WebuiModelPicker({
               id={triggerId}
               className="webui-model-selector-trigger"
               aria-label="Model"
+              // The trigger's narrow form is a glyph, so the model it stands
+              // for has to stay reachable: the hover affordance carries the
+              // name the visible label would have carried (ADR 0025).
+              title={selected ? triggerText : undefined}
             >
+              <span className="webui-model-trigger-icon">
+                <WebuiIconModel />
+              </span>
               <span className="flex min-w-0 items-baseline gap-[6px]">
-                <span className="min-w-0 truncate whitespace-nowrap">
+                <span className="webui-model-trigger-label min-w-0 truncate whitespace-nowrap">
                   {triggerText}
                 </span>
                 {/*
@@ -342,7 +349,7 @@ export function WebuiModelPicker({
                   </span>
                 ) : null}
               </span>
-              <WebuiIconChevronDown className="flex-shrink-0 text-icon_default_tertiary" />
+              <WebuiIconChevronDown className="webui-model-trigger-chevron flex-shrink-0 text-icon_default_tertiary" />
             </button>
           );
         }}

@@ -1,7 +1,7 @@
 import type { ChangeEvent, ComponentProps, ReactElement, ReactNode, RefObject } from "react";
 import { WebuiProjectList } from "./SessionRail.js";
 import { RailRow } from "./RailRow.js";
-import { WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
+import { WebuiIconBrand, WebuiIconContextExport, WebuiIconNewTask, WebuiIconPlugins, WebuiIconRemote, WebuiIconSessionImport, WebuiIconSites } from "../../../shell/icons.js";
 
 type ProjectListProps = ComponentProps<typeof WebuiProjectList>;
 
@@ -30,9 +30,21 @@ export function SessionRailRegion(props: {
       aria-label="Primary navigation"
       data-webui-shell-region="rail"
       data-webui-rail-width={props.collapsed ? "64" : "240"}
-      className={`webui-rail relative z-50 flex h-full select-none flex-col overflow-visible ${props.collapsed ? "w-[64px] bg-transparent" : "w-[240px] bg-bg_default_scrim"}`}
+      className={`webui-rail relative flex h-full select-none flex-col overflow-visible ${props.collapsed ? "bg-transparent" : "bg-bg_default_scrim"}`}
     >
-      <div className="h-[50px] flex-shrink-0" aria-hidden="true" />
+      {/*
+       * The rail's brand.
+       *
+       * The rail's top used to hold nothing but the shadow of the toolbar that
+       * floated over the window. It is the rail's own header now, and the
+       * one place that says which product this is (ADR 0025).
+       */}
+      {props.collapsed
+        ? <div className="h-[50px] flex-shrink-0" aria-hidden="true" />
+        : <div className="webui-rail-brand" data-webui-rail-brand="true">
+          <WebuiIconBrand className="size-5 flex-shrink-0" />
+          <span className="webui-rail-brand-name">MiniMax Code</span>
+        </div>}
       {!props.collapsed ? <>
         <div className="flex-shrink-0 px-4 pb-px" data-webui-rail-fixed-row="true">
           <RailRow label="新建任务" icon={<WebuiIconNewTask className="flex-shrink-0" />} active={props.homeMode && !props.pluginManagementOpen} onSelect={props.startNewTask} />

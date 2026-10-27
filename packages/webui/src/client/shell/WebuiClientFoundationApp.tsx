@@ -6,6 +6,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,7 @@ import { Transcript } from "../features/transcript/ui/Transcript.js";
 import { UserMenu } from "../features/account/ui/UserMenu.js";
 import { readWebuiMemoryHandoffPrompt, type MemoryHandoff } from "../features/settings/contracts/memory-handoff.js";
 import { WebuiWorkspacePanel } from "../features/workspace/ui/WorkspacePanels.js";
+import { webuiRailIsDrawer, WEBUI_PROGRESS_PANEL_NARROW_QUERY } from "../ui/layout-thresholds.js";
 import { WebuiProgressOverviewPanel } from "../features/workspace/ui/WorkspaceProgressPanel.js";
 import {
   getWorkspacePanelSessionState,
@@ -790,6 +792,92 @@ export function WebuiClientFoundationApp(
   const [workspaceEnvironmentCollapsed, setWorkspaceEnvironmentCollapsed] = useState(false);
   const [workspaceProgressCollapsed, setWorkspaceProgressCollapsed] = useState(false);
   const [workspaceSubagentsCollapsed, setWorkspaceSubagentsCollapsed] = useState(false);
+  /**
+   * The rail's form.
+   *
+   * Below the compact width the rail is an overlay drawer rather than a column:
+   * a 240px column on a 360px screen would leave the conversation nothing, and
+   * the conversation is the thing the client is for (ADR 0025).
+   *
+   * The rail's width is the viewport's business rather than a container's — it
+   * is the one element that spans the whole window — so this is the one form
+   * the shell measures rather than queries.
+   */
+  const [railIsDrawer, setRailIsDrawer] = useState(false);
+  const [railDrawerOpen, setRailDrawerOpen] = useState(false);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    // The mode is the only thing the shell re-renders for: the width itself is
+    // read where it is needed, so a window that is being dragged does not
+    // re-render the shell on every frame.
+    const measure = (): void => {
+      const width = shell.getBoundingClientRect().width;
+      const next = webuiRailIsDrawer(width);
+      setRailIsDrawer((current) => (current === next ? current : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(shell);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    // A drawer that is closed by a wider window must not stay open.
+    if (!railIsDrawer) setRailDrawerOpen(false);
+  }, [railIsDrawer]);
+  useEffect(() => {
+    if (!railDrawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setRailDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [railDrawerOpen]);
+  const railExpanded = railIsDrawer ? railDrawerOpen : !railCollapsed;
+  const toggleRail = (): void => {
+    if (railIsDrawer) {
+      setRailDrawerOpen((open) => !open);
+      return;
+    }
+    setRailCollapsed((collapsed) => !collapsed);
+  };
+  /**
+   * Whether the window is wide enough for the progress panel.
+   *
+   * The panel is a card that floats over the conversation's right edge, and the
+   * conversation keeps a gutter for it so that the card lands in the gutter
+   * rather than on top of the text. Below the contract's width the
+   * conversation cannot spare that gutter, so the panel closes itself rather
+   * than covering what it is meant to report on (ADR 0025).
+   *
+   * The card is anchored to the window rather than to the surface, so this is
+   * the window's business, and it is read with the same media condition the
+   * stylesheet uses: one question, one answer, no second judge to drift.
+   */
+  const [progressPanelFits, setProgressPanelFits] = useState(() => {
+    // Read once at mount, so a window that is already too narrow never paints
+    // the card before the first measurement takes it away.
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return true;
+    return !window.matchMedia(WEBUI_PROGRESS_PANEL_NARROW_QUERY).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const narrow = window.matchMedia(WEBUI_PROGRESS_PANEL_NARROW_QUERY);
+    const sync = (): void => setProgressPanelFits(!narrow.matches);
+    sync();
+    narrow.addEventListener("change", sync);
+    return () => narrow.removeEventListener("change", sync);
+  }, []);
+  useEffect(() => {
+    // A window that narrows past the width closes the panel, and it stays
+    // closed: it does not come back on its own when the window widens again.
+    if (progressPanelFits || !progressPanelOpen) return;
+    setProgressPanelOpen(false);
+  }, [progressPanelFits, progressPanelOpen, setProgressPanelOpen]);
+  /** The panel is open only where the conversation can spare the card's gutter. */
+  const progressPanelVisible = progressPanelOpen && progressPanelFits;
   useEffect(() => {
     // These sections derive from the selected session/workspace. Do
     // not carry a previous session's collapsed state into the next session.
@@ -818,36 +906,22 @@ export function WebuiClientFoundationApp(
     <WebuiSessionWorkflowsProvider workflows={sessionWorkflows}>
     <WebuiApplicationProvider application={application}>
     <ArchonShell>
-    <div data-webui-shell="two-column" className="w-full h-screen relative">
+    <div ref={shellRef} data-webui-shell="two-column" data-webui-rail-collapsed={railCollapsed ? "true" : undefined} data-webui-rail-mode={railIsDrawer ? "drawer" : "column"} data-webui-rail-open={railDrawerOpen ? "true" : undefined} className="w-full h-screen relative">
       <div className="relative flex h-screen overflow-hidden bg-bg_grouped_secondary">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[50] h-[46px]" />
-        <div className="pointer-events-none absolute left-[126px] top-0 z-[60] flex h-[38px] items-center gap-1">
+
+        {/* The drawer's scrim. It closes the drawer and takes the surface's
+          * clicks while it is open, so the content behind a drawer is not
+          * reachable by tapping it. */}
+        {railDrawerOpen ? (
           <button
             type="button"
-            data-webui-sidebar-toggle="true"
-            aria-label={railCollapsed ? "展开导航栏" : "收起导航栏"}
-            aria-expanded={!railCollapsed}
-            onClick={() => setRailCollapsed((collapsed) => !collapsed)}
-            className="pointer-events-auto flex size-8 items-center justify-center rounded-[8px] text-text_default_tertiary hover:bg-bg_interaction_tertiary_hover"
-          >
-            <WebuiIconSidebarToggle />
-          </button>
-          <button
-            type="button"
-            data-webui-search="true"
-            aria-expanded={railSearchOpen}
-            aria-controls="webui-rail-search"
-            aria-label="搜索"
-            onClick={() => (railSearchOpen ? closeRailSearch() : openRailSearch())}
-            className={`pointer-events-auto flex size-[30px] items-center justify-center rounded-lg text-text_default_tertiary ${
-              railSearchOpen
-                ? "bg-bg_interaction_tertiary_hover text-text_default_secondary"
-                : "hover:bg-bg_interaction_tertiary_hover"
-            }`}
-          >
-            <WebuiIconSearch />
-          </button>
-        </div>
+            data-webui-rail-scrim="true"
+            aria-label="关闭导航栏"
+            onClick={() => setRailDrawerOpen(false)}
+            className="webui-rail-scrim"
+          />
+        ) : null}
 
         <div className="contents">
           {/* -------------------------------------------------------------- rail */}
@@ -931,13 +1005,46 @@ export function WebuiClientFoundationApp(
               home={homeMode}
               title={selectedSession?.title}
               greetingPending={homeGreetingPending}
-              railCollapsed={railCollapsed}
-              progressOpen={progressPanelOpen}
+              progressOpen={progressPanelVisible}
+              progressPanelAvailable={progressPanelFits}
+              workspacePanelOpen={workspacePanel.open}
+              headerTools={<>
+                <button
+                  type="button"
+                  data-webui-sidebar-toggle="true"
+                  aria-label={railExpanded ? "收起导航栏" : "展开导航栏"}
+                  aria-expanded={railExpanded}
+                  onClick={toggleRail}
+                  className="flex size-8 items-center justify-center rounded-[8px] text-text_default_tertiary hover:bg-bg_interaction_tertiary_hover"
+                >
+                  <WebuiIconSidebarToggle />
+                </button>
+                <button
+                  type="button"
+                  data-webui-search="true"
+                  aria-expanded={railSearchOpen}
+                  aria-controls="webui-rail-search"
+                  aria-label="搜索"
+                  onClick={() => (railSearchOpen ? closeRailSearch() : openRailSearch())}
+                  className={`flex size-[30px] items-center justify-center rounded-lg text-text_default_tertiary ${
+                    railSearchOpen
+                      ? "bg-bg_interaction_tertiary_hover text-text_default_secondary"
+                      : "hover:bg-bg_interaction_tertiary_hover"
+                  }`}
+                >
+                  <WebuiIconSearch />
+                </button>
+              </>}
               onOpenBrowser={() => {
                 setProgressPanelOpen(false);
                 dispatchWorkspacePanel({ type: "open-panel" });
               }}
-              onToggleProgress={() => setProgressPanelOpen((open) => !open)}
+              onToggleProgress={() => {
+                // Where the panel cannot be open, the toggle says so instead of
+                // opening a card that would cover the conversation.
+                if (!progressPanelFits) return;
+                setProgressPanelOpen((open) => !open);
+              }}
               usageBanner={visibleUsageNotice ? <ConversationUsageBanner
                 notice={visibleUsageNotice}
                 messageText={visibleUsageNotice.kind === "weekly" ? "本周配额接近上限。" : visibleUsageNotice.kind === "five_hour" ? "五小时配额接近上限。" : "本周期视频配额已用尽。"}

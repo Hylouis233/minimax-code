@@ -4709,6 +4709,24 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "client/styles/layout.css",
+      "layers": [
+        "unknown"
+      ],
+      "role": "styles",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/ui/layout-thresholds.ts",
+      "layers": [
+        "bindings"
+      ],
+      "role": "ui",
+      "business": null,
+      "home": "target"
     }
   ],
   "directions": [

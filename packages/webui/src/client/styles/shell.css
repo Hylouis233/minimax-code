@@ -182,14 +182,20 @@
     from { opacity: 0; transform: translateY(2px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .webui-session-title-row {
-    min-height: 24px;
-    padding-left: var(--spacing_12);
-  }
-  .webui-session-title-row[data-webui-rail-collapsed] {
-    padding-left: 142px;
-  }
+  /* The session title, in the header row.
+   *
+   * The title used to sit in its own row that carried a left padding chosen
+   * to clear the floating toolbar: two literals describing one geometry, and
+   * they disagreed — in the rail's drawer form the toolbar still sat where the
+   * rail's column used to be, on top of the title. The title now sits in a
+   * row with the buttons themselves, so it starts after them by construction
+   * and gives way by truncating (ADR 0025). */
   .webui-session-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--text_default_primary);
     font-size: var(--size_14);
     font-weight: var(--weight_medium);

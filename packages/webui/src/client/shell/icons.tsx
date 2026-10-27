@@ -56,6 +56,8 @@ export function WebuiIconSessionTreeDisclosure({ className }: WebuiIconProps): R
 export function WebuiIconPermissionRequest({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldLock, className); }
 export function WebuiIconPermissionAuto({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldCheck, className); }
 export function WebuiIconPermissionFull({ className }: WebuiIconProps): ReactElement { return glyph(IconShieldX, className); }
+/** The model picker's own glyph, for the trigger's narrow form. */
+export function WebuiIconModel({ className }: WebuiIconProps): ReactElement { return glyph(IconSparkles, className); }
 export function WebuiIconFile({ className }: WebuiIconProps): ReactElement { return glyph(IconFile, className); }
 export function WebuiIconDiffSummary({ className }: WebuiIconProps): ReactElement { return glyph(IconGitCompare, className); }
 export function WebuiIconDiffFile({ className }: WebuiIconProps & { readonly fileName?: string }): ReactElement { return glyph(IconFileCode, className); }

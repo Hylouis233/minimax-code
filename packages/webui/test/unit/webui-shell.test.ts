@@ -1029,8 +1029,10 @@ describe("WebUI shell — desktop anatomy", () => {
     const html = renderShell();
 
     // 240px fixed, one step off the main surface, and no border between the two.
+    // The width is declared once, in the stylesheet: the markup used to carry
+    // `w-[240px]` as well, so the two copies had to keep agreeing (ADR 0025).
     expect(html).toMatch(/data-webui-rail-width="240"/u);
-    expect(html).toMatch(/w-\[240px\]/u);
+    expect(html).not.toMatch(/w-\[240px\]/u);
     expect(html).toMatch(/webui-rail-scroll/u);
     expect(html).toMatch(/bg-bg_default_scrim/u);
     // The main surface is the lightest step.
@@ -1060,11 +1062,15 @@ describe("WebUI shell — desktop anatomy", () => {
   it("stacks the rail in the desktop's order", () => {
     const html = renderShell();
     const order = [
-      'data-webui-sidebar-toggle="true"',
+      'data-webui-rail-brand="true"',
       'data-webui-rail-fixed-row="true"',
       'data-webui-nav-item="插件"',
       'data-webui-rail-section-header="true"',
       'data-webui-rail-identity="true"',
+      // The rail's toggle is the session header's first control now, so it
+      // comes after the rail rather than floating over its top corner
+      // (ADR 0025).
+      'data-webui-sidebar-toggle="true"',
     ];
     let cursor = -1;
     for (const marker of order) {
@@ -1326,7 +1332,10 @@ describe("WebUI shell — desktop anatomy", () => {
 
     expect(html).toMatch(/data-webui-session-layout="true"/u);
     expect(html).not.toMatch(/webui-session-surface-with-workspace/u);
-    expect(html).toMatch(/webui-session-layout relative flex h-full min-h-0 w-full/u);
+    // The session column is the header row plus the conversation, so the
+    // conversation takes the rest of the column's height rather than all of
+    // it (ADR 0025).
+    expect(html).toMatch(/webui-session-layout relative flex min-h-0 w-full flex-1 flex-col/u);
     expect(html).toMatch(/data-webui-session-transcript-scroll="true"/u);
     expect(html).toMatch(/data-webui-session-composer="true"/u);
     expect(html).toMatch(/webui-session-transcript-scroll/u);

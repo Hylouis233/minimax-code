@@ -19,6 +19,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { SKELETON_CONTENT_MAX_WIDTH_PX } from "../../src/client/features/transcript/ui/TranscriptSkeletons.js";
+import { WEBUI_LAYOUT_THRESHOLDS } from "../../src/client/ui/layout-thresholds.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -139,7 +140,8 @@ let indexCss: string;
 /**
  * A rule that participates in the file's normal cascade: inside the
  * `@layer components` wrapper, but not inside a conditional at-rule. Rules
- * nested in `@media` are a separate concern and are asserted separately.
+ * nested in `@media`, `@container` or `@supports` are a separate concern and
+ * are asserted separately.
  */
 function isCascading(rule: CssRule): boolean {
   return (
@@ -147,6 +149,7 @@ function isCascading(rule: CssRule): boolean {
     !rule.context.some(
       (entry) =>
         entry.startsWith("@media") ||
+        entry.startsWith("@container") ||
         entry.startsWith("@supports") ||
         entry.startsWith("@keyframes"),
     )
@@ -516,6 +519,9 @@ describe("W0 · stylesheet composition", () => {
     expect(imports).toEqual([
       "./tokens.css",
       "./shell.css",
+      // The layout threshold contract (ADR 0025): the widths the client adapts
+      // at, and the shell skeleton's own rules.
+      "./layout.css",
       // The terminal's own stylesheet, brought in by the package that owns it
       // rather than copied into the shell's tree.
       "@xterm/xterm/css/xterm.css",
@@ -558,13 +564,17 @@ describe("W0 · stylesheet composition", () => {
 
 describe("W0 · structural declarations W5 must preserve", () => {
   it("keeps the rail at the desktop's fixed width", () => {
-    // The shell markup pins the same value via `w-[240px]`, so the two must
-    // keep agreeing — a rail that is 240 in CSS but 256 in markup renders at
+    // The rail's width is the shell skeleton's, and it is declared once: the
+    // markup used to carry `w-[240px]` as well, so the two had to keep
+    // agreeing — a rail that is 240 in CSS but 256 in markup renders at
     // whichever wins, which is how the two drifted apart in the first place.
-    expect(declaration(winning(".webui-rail").body, "width")).toBe("240px");
+    expect(winningDeclaration(".webui-rail", "width")).toBe("240px");
+    // The collapsed rail is narrower, and the collapsed state is carried by the
+    // attribute the markup already publishes.
+    expect(winningDeclaration('.webui-rail[data-webui-rail-width="64"]', "width")).toBe("64px");
   });
 
-  it("reserves a non-overlapping right gutter while the progress panel floats", () => {
+  it("reserves a right gutter for the progress panel that floats over the conversation", () => {
     expect(declarationsFor(".webui-session-layout")).toContain("min-height: 0");
     expect(declaration(winning(".webui-session-layout").body, "position")).toBe(
       "relative",
@@ -572,11 +582,18 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(declaration(winning(".webui-session-layout").body, "width")).toBe(
       "100%",
     );
-    // Must stay wider than the floating progress panel itself, or the panel
-    // would sit on top of the transcript instead of beside it.
+    // The progress panel is a card that floats over the conversation's right
+    // edge, and the conversation keeps a gutter for it so the card lands in
+    // the gutter instead of on top of the text. Below the width the
+    // conversation cannot spare the gutter, so the card closes itself rather
+    // than float over the corner — and the gutter is dropped at the same
+    // width, so the card is never open without a place of its own.
     expect(
       declaration(winning(".webui-session-has-progress-panel").body, "padding-right"),
     ).toBe("312px");
+    expect(shellCss).toContain(
+      `@media (max-width: ${WEBUI_LAYOUT_THRESHOLDS.progressPanelMinWidth - 1}px)`,
+    );
 
     const viewport = winning(".webui-session-scroll-viewport");
     expect(declaration(viewport.body, "min-height")).toBe("0");
@@ -588,9 +605,14 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(declaration(sessionViewport.body, "min-width")).toBe("0");
     expect(declaration(sessionViewport.body, "align-items")).toBe("stretch");
 
+    // The card is anchored to the window, so the window is what decides how
+    // much room it has, and the card keeps the shape it has always had.
     const progressMotion = winning(".webui-progress-panel-motion");
     expect(declaration(progressMotion.body, "position")).toBe("fixed");
     expect(declaration(progressMotion.body, "overflow")).toBe("hidden");
+    expect(declaration(progressMotion.body, "max-width")).toBe(
+      "min(288px, calc(100vw - 24px))",
+    );
     const progressPanel = winning(".webui-progress-overview-panel");
     expect(declaration(progressPanel.body, "min-height")).toBe("0");
     const workspaceSectionTitle = winning(".webui-workspace-section-title");
@@ -607,6 +629,7 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(progressCard.body).toContain(
       "max-height: max(0px, min(560px, calc(100dvh - 88px)))",
     );
+
     expect(declarationsFor(".webui-progress-overview-card.has-extended-content")).toHaveLength(0);
     const sectionTitleText = winning(".webui-workspace-section-title > [data-workspace-section-title]");
     expect(declaration(sectionTitleText.body, "flex")).toBe("1 1 auto");
@@ -727,7 +750,14 @@ describe("W0 · structural declarations W5 must preserve", () => {
     expect(declaration(panel.body, "position")).toBe("relative");
     expect(declaration(panel.body, "flex")).toBe("0 1 50%");
     expect(declaration(panel.body, "width")).toBe("50%");
-    expect(declaration(panel.body, "min-width")).toBe("0");
+    // The panel has a floor, and it may not claim the space the conversation
+    // column needs. `min-width: 0` was the declaration that a flex child may
+    // be clipped to nothing, and it is what let the conversation column be
+    // squeezed away entirely (ADR 0025).
+    expect(declaration(panel.body, "min-width")).toBe("var(--webui-panel-min)");
+    expect(declaration(panel.body, "max-width")).toBe(
+      "calc(100% - var(--webui-conversation-min))",
+    );
     // The expanded panel is declared together with the covering one, so the
     // cascade lookup is the one that reads a grouped selector.
     // The panel covers its own container, which the container already pins to
@@ -1052,9 +1082,14 @@ describe("W0 · stacking order", () => {
       // (70) and the dialog bands (100+). The context-usage POPOVER is not
       // among them any more — it is a dropdown, portalled to the document root
       // and layered by the shared surface at 120.
-      // 80 is gone: it was the composer's own menu band, and the composer
-      // menus, the command palette and the mention list are dropdowns now —
-      // placed and layered by the shared surface at 120.
+      // 80 is the rail drawer's scrim: below the compact width the rail
+      // floats over the surface, and the scrim dims and blocks the whole
+      // shell behind it. It has to clear every shell surface — the composer's
+      // own overlay (60) and the expanded workspace panel (70) among them —
+      // and stay under the portalled menus (120) and dialogs (100+).
+      // 90 is the rail drawer itself: above its own scrim (80), and under the
+      // portalled menus and dialogs, so a dropdown opened from inside the
+      // drawer is still above the drawer that opened it.
       // 121 is the band just above the 120 dialog scrim: the context menu's
       // submenu.
       // 130 is `.webui-account-usage-cell-tip`, the account page's calendar
@@ -1076,7 +1111,7 @@ describe("W0 · stacking order", () => {
       // 4 is gone: it was the workspace panel's add-menu anchor, and the add
       // menu became the launcher's tiles. The launcher is a tab's content
       // rather than an overlay, so it needs no layer of its own.
-      1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 100, 110, 111, 120, 121, 130, 140, 1400,
+      1, 2, 3, 5, 20, 40, 45, 50, 60, 70, 80, 90, 100, 110, 111, 120, 121, 130, 140, 1400,
     ]);
   });
 });
