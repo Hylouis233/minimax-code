@@ -315,7 +315,10 @@ describe("WebUI shell", () => {
 
     const controls = renderToStaticMarkup(createElement(WebuiWorkspacePanelControls, { browserPanelOpen: false, progressPanelOpen: true, onOpenBrowser: () => undefined, onToggleProgressPanel: () => undefined }));
     expect(controls).toContain('aria-label="浏览器"');
-    expect(controls).toContain('title="浏览器"');
+    // The control is an icon button now, so the label is the accessible name
+    // rather than a tooltip: `aria-label` is what a screen reader reads, and a
+    // `title` would only add a hover affordance the glyph already carries.
+    expect(controls).not.toContain('title="浏览器"');
     // The control's glyph is the tabler browser icon. It used to be a globe
     // drawn by hand, so the assertion names the icon rather than the shape it
     // happens to be made of.

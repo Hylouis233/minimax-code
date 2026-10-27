@@ -415,11 +415,14 @@ describe("the new tab page", () => {
   });
 
   it("passes a bare host to the browser as a url it can open", () => {
-    expect(webuiWorkspaceLauncherUrl("example.test")).toBe("https://example.test");
+    // The launcher hands the browser its own address form: a bare host is a
+    // web address, and the browser's normalisation is what says which one it
+    // is. A host with no path keeps the browser's own trailing slash.
+    expect(webuiWorkspaceLauncherUrl("example.test")).toBe("https://example.test/");
     expect(webuiWorkspaceLauncherUrl("  example.test/a  ")).toBe("https://example.test/a");
     expect(webuiWorkspaceLauncherUrl("http://example.test/a")).toBe("http://example.test/a");
     // A host with a port is a host, not a scheme.
-    expect(webuiWorkspaceLauncherUrl("localhost:3000")).toBe("https://localhost:3000");
+    expect(webuiWorkspaceLauncherUrl("localhost:3000")).toBe("https://localhost:3000/");
     // An empty box opens nothing rather than opening a blank page.
     expect(webuiWorkspaceLauncherUrl("   ")).toBe("");
   });

@@ -136,11 +136,12 @@ describe("a web tab's toolbar", () => {
   });
 
   it("is carried by the browser business's host, over the tab's target", () => {
-    // The toolbar is rendered by the host the strip mounts, and the strip hands
-    // it the tab's own target and url — so the row and the frame describe the
-    // same page rather than a pair that has drifted.
-    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoBack={activeTab.content.canGoBack}");
-    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoForward={activeTab.content.canGoForward}");
+    // The toolbar is rendered by the host the panel mounts, and the panel hands
+    // it one tab's own target and url — so the row and the frame describe the
+    // same page rather than a pair that has drifted. That tab is the one the
+    // panel kept mounted, which is the one whose frame the reader is looking at.
+    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoBack={browserTab.content.canGoBack}");
+    expect(WORKSPACE_PANELS_SOURCE).toContain("canGoForward={browserTab.content.canGoForward}");
     expect(WORKSPACE_PANELS_SOURCE).toContain('type: "return-web-tab-to-launcher"');
   });
 
