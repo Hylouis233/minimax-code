@@ -1885,6 +1885,15 @@
       "home": "target"
     },
     {
+      "path": "client/features/settings/projection/settings-shortcuts.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "feature-projection",
+      "business": "settings",
+      "home": "target"
+    },
+    {
       "path": "client/features/settings/projection/settings-view.ts",
       "layers": [
         "view"
@@ -1967,6 +1976,15 @@
     },
     {
       "path": "client/features/settings/ui/SettingsModal.tsx",
+      "layers": [
+        "bindings"
+      ],
+      "role": "feature-ui",
+      "business": "settings",
+      "home": "target"
+    },
+    {
+      "path": "client/features/settings/ui/ShortcutsSettings.tsx",
       "layers": [
         "bindings"
       ],
@@ -3182,6 +3200,15 @@
     },
     {
       "path": "client/projection/common/router.ts",
+      "layers": [
+        "view"
+      ],
+      "role": "projection-common",
+      "business": null,
+      "home": "current"
+    },
+    {
+      "path": "client/projection/common/shortcuts.ts",
       "layers": [
         "view"
       ],

@@ -3,6 +3,7 @@ import type {
   WebuiSlashCommandFields,
 } from "../contracts/slash-command.js";
 import { classifyWebuiSlashCommand } from "../contracts/slash-command.js";
+import { shortcutMatches, type ShortcutBindings, type ShortcutKeyEvent } from "../../../projection/common/shortcuts.js";
 export type WebuiSubmissionIntent =
   | { readonly kind: "activate-goal-mode" }
   | { readonly kind: "activate-plan-mode" }
@@ -55,19 +56,33 @@ export function resolveWebuiSubmissionIntent(args: {
   return { kind: "submit-turn" };
 }
 
-export type WebuiComposerEnterAction = "submit" | "newline";
+export type WebuiComposerShortcutAction = "submit" | "newline" | "ignore";
 
-export function resolveWebuiComposerEnterAction(args: {
-  readonly shiftKey: boolean;
-  readonly altKey: boolean;
-  readonly ctrlKey: boolean;
-  readonly metaKey: boolean;
+/**
+ * What a key press in the composer does.
+ *
+ * The rule is the configured binding, not a hard-coded one: the settings page
+ * can bind "send the message" to any combination, and the composer follows it.
+ * `ignore` is the answer for a press that names no binding at all — the
+ * browser's own behaviour then stands, which is how a key that is not bound
+ * keeps doing what a key in a textarea does.
+ *
+ * The default bindings (`Enter` sends, `Shift+Enter` breaks the line) reproduce
+ * the rule this composer had before the bindings were rebindable.
+ */
+export function resolveWebuiComposerShortcutAction(args: {
+  readonly event: ShortcutKeyEvent;
   readonly isComposing: boolean;
   readonly submitBlocked: boolean;
-}): WebuiComposerEnterAction {
-  if (args.shiftKey || args.altKey || args.ctrlKey || args.metaKey) return "newline";
-  if (args.isComposing || args.submitBlocked) return "newline";
-  return "submit";
+  readonly bindings: ShortcutBindings;
+}): WebuiComposerShortcutAction {
+  // While an input method is composing, Enter belongs to the composition.
+  if (args.isComposing) return "ignore";
+  if (shortcutMatches(args.bindings["composer.submit"], args.event)) {
+    return args.submitBlocked ? "ignore" : "submit";
+  }
+  if (shortcutMatches(args.bindings["composer.newline"], args.event)) return "newline";
+  return "ignore";
 }
 
 export function deriveRecentWorkspaceDirs(

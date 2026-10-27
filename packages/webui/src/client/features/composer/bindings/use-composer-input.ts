@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { findWebuiMentionRange, removeWebuiSlashToken, type WebuiMentionRange, type WebuiSlashRange } from "../projection/composer-interactions.js";
-import { resolveWebuiComposerEnterAction } from "../projection/composer-state.js";
+import { resolveWebuiComposerShortcutAction } from "../projection/composer-state.js";
+import { parseShortcutBindings, shortcutBaseKey, SHORTCUT_STORAGE_KEY } from "../../../projection/common/shortcuts.js";
+import { useWebuiBrowserCapabilities } from "../../../bindings/browser-capabilities.js";
 import { shouldRecallWebuiHistory, startWebuiHistoryBrowse, stepWebuiHistoryBrowse, type WebuiHistoryBrowse } from "../application/composer-history.js";
 
 export interface ComposerInputKeyOptions {
@@ -59,6 +61,10 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
   const [mentionIndex, setMentionIndex] = useState(0);
   const [commandIndex, setCommandIndex] = useState(0);
   const [historyBrowse, setHistoryBrowse] = useState<WebuiHistoryBrowse>();
+  // The bindings are read when a key is pressed rather than held in state: the
+  // settings page can change them while the composer is open, and the next
+  // press must follow the binding the user just set.
+  const { storage } = useWebuiBrowserCapabilities();
 
   useEffect(() => setHistoryBrowse(undefined), [sessionId]);
 
@@ -84,6 +90,27 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
     }
     input.setMentionRange(nextRange);
   }, []);
+
+  /**
+   * Breaks the line at the caret.
+   *
+   * `Enter` breaks the line by itself, so this is only reached for a newline
+   * bound to a key the browser does not break the line on.
+   */
+  const insertNewline = useCallback((event: KeyboardEvent<HTMLTextAreaElement>, options: ComposerInputKeyOptions) => {
+    const caret = event.currentTarget.selectionStart ?? options.draft.length;
+    const value = `${options.draft.slice(0, caret)}\n${options.draft.slice(caret)}`;
+    pendingCaret.current = caret + 1;
+    edit({
+      value,
+      caret: caret + 1,
+      changeDraft: options.onHistoryDraftChange ?? options.onDraftChange,
+      mentionRange: options.mentionRange,
+      setMentionRange: options.setMentionRange,
+      setComposerMenu: options.setComposerMenu,
+      setPermissionMenuOpen: options.setPermissionMenuOpen,
+    });
+  }, [edit]);
 
   const updateCaret: ReturnType<typeof useComposerInput>["updateCaret"] = useCallback((value, nextCaret, _mentionRange, setMentionRange) => {
     setCaret(nextCaret);
@@ -145,18 +172,29 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
         return;
       }
     }
-    if (event.key === "Enter" && options.commandCount === 0) {
-      const action = resolveWebuiComposerEnterAction({
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
+    if (options.commandCount === 0) {
+      const bindings = parseShortcutBindings(storage.getItem(SHORTCUT_STORAGE_KEY));
+      const action = resolveWebuiComposerShortcutAction({
+        event: {
+          key: event.key,
+          code: event.code,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          altKey: event.altKey,
+          shiftKey: event.shiftKey,
+        },
         isComposing: event.nativeEvent.isComposing,
         submitBlocked: options.submitBlocked,
+        bindings,
       });
       if (action === "submit") {
         event.preventDefault();
         event.currentTarget.form?.requestSubmit();
+        return;
+      }
+      if (action === "newline" && shortcutBaseKey(bindings["composer.newline"]) !== "Enter") {
+        event.preventDefault();
+        insertNewline(event, options);
         return;
       }
     }
@@ -171,7 +209,7 @@ export function useComposerInput(draft: string, sessionId?: string): ComposerInp
       event.preventDefault();
       options.chooseCommand(commandIndex);
     }
-  }, [applyHistoryDraft, commandIndex, historyBrowse, mentionIndex]);
+  }, [applyHistoryDraft, commandIndex, historyBrowse, insertNewline, mentionIndex, storage]);
 
   return {
     textareaRef, caret, setCaret, mentionIndex, setMentionIndex, commandIndex, setCommandIndex,

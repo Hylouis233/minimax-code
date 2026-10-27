@@ -13,7 +13,7 @@ export type SettingsTabKey = "desktop" | "shortcuts" | "voice" | "custom-instruc
 export interface SettingsTabDefinition { readonly key: SettingsTabKey; readonly group: "preferences" | "management" | "coding" | "archived"; readonly label: string; readonly icon: string; readonly disabled?: boolean; }
 
 export const DESKTOP_SETTINGS_TABS: readonly SettingsTabDefinition[] = [
-{ key: "desktop", group: "preferences", label: "通用", icon: "desktop" }, { key: "voice", group: "preferences", label: "语音", icon: "voice", disabled: true }, { key: "shortcuts", group: "preferences", label: "快捷键", icon: "shortcuts", disabled: true }, { key: "custom-instructions", group: "preferences", label: "个性化", icon: "custom-instructions" },
+{ key: "desktop", group: "preferences", label: "通用", icon: "desktop" }, { key: "voice", group: "preferences", label: "语音", icon: "voice", disabled: true }, { key: "shortcuts", group: "preferences", label: "快捷键", icon: "shortcuts" }, { key: "custom-instructions", group: "preferences", label: "个性化", icon: "custom-instructions" },
   // The browser switches were under the browser panel, in the tool area. A
   // setting that lives in a panel is a setting nobody finds without opening
   // that panel first, so they are a page of their own — under 偏好, next to

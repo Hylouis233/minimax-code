@@ -90,7 +90,10 @@ is the sole decision record for Mini App hosting. ADR 0021 records the model pic
 with two states, and the cascade it replaces. ADR 0024 records the client-side workspace boundary
 for a diff body: a diff entry outside the workspace keeps its name and its counts and loses its
 content, the boundary is lexical, and a diff whose workspace root the client does not know is not
-withheld. A new decision takes the next free number.
+withheld. ADR 0026 records the composer's keyboard bindings as the settings page stores them: one
+canonical notation, the settings page owns the change, the composer reads the stored binding when
+a key is pressed, and only the actions that already have keyboard meaning are bindable. A new
+decision takes the next free number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |
