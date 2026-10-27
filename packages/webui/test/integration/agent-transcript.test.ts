@@ -42,6 +42,31 @@ const PROVIDER_ID = `custom_provider:${PROVIDER_NAME}`;
  */
 const FIRST_SCREEN_TIMEOUT_MS = 30_000;
 
+/**
+ * The deadline for a wait on the workspace-change event.
+ *
+ * The event does not travel straight from the file write to the subscriber.
+ * The Runtime watches the workspace, coalesces the raw filesystem events over
+ * a quiet window, classifies the batch by asking Git whether the paths are
+ * ignored — a subprocess — and then coalesces the resulting notifications over
+ * a second window before it publishes. The quiet window alone is 120ms, the
+ * watcher allows a batch up to 800ms, and the notification window is 250ms,
+ * so the designed budget is already past a second before Git's own answer is
+ * counted.
+ *
+ * `expect.poll` would otherwise use Vitest's 1s default, which is shorter
+ * than that budget. On a loaded runner, or whenever the Git classification
+ * takes its time, the event then arrives after the wait has given up and the
+ * case fails with the file written and the event missing — the Runtime
+ * behaved correctly and the gate called it a regression. This wait therefore
+ * carries a budget of its own, the same way the first-screen wait above
+ * carries one.
+ *
+ * A missing event still fails the case: this deadline bounds how long the
+ * wait may take, it does not replace the assertion.
+ */
+const WORKSPACE_EVENT_TIMEOUT_MS = 15_000;
+
 function frame(delta: Record<string, unknown>, finishReason: string | null = null) {
   return `data: ${JSON.stringify({
     id: "chatcmpl-agent-transcript",
@@ -1396,7 +1421,8 @@ it("a real agent turn resumes after refresh and drains a queued message in order
     await expect.poll(async () => readFile(path.join(workspaceDir, "runtime-panel-change.txt"), "utf8")
       .catch(() => undefined)).toBe("Created through the real local Agent write tool.\n");
     try {
-      await expect.poll(() => runtimeEvents.some((event) => isWorkspaceChangedEvent(event, workspaceDir)))
+      await expect.poll(() => runtimeEvents.some((event) => isWorkspaceChangedEvent(event, workspaceDir)),
+        { timeout: WORKSPACE_EVENT_TIMEOUT_MS })
         .toBe(true);
     } catch (error) {
       throw new Error(`${error instanceof Error ? error.message : String(error)}\n${JSON.stringify({
