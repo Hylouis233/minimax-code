@@ -4934,6 +4934,15 @@
       "role": "outside",
       "business": null,
       "home": "outside"
+    },
+    {
+      "path": "server/miniapp/agent-panels.ts",
+      "layers": [
+        "server"
+      ],
+      "role": "outside",
+      "business": null,
+      "home": "outside"
     }
   ],
   "directions": [

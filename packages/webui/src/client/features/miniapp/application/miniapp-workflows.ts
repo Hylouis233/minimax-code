@@ -277,6 +277,15 @@ export interface WebuiMiniAppWorkflows {
    * The call is idempotent because a selection can be re-announced.
    */
   readonly noteSelectedSession: (sessionId: string | undefined) => void;
+  /**
+   * Resolve once the client's selection is `sessionId`.
+   *
+   * A page's `open` becomes "shown" only when the rail has it, so the view waits
+   * for the selection to land before reporting. `false` means it did not land
+   * within the bound, and nothing was reported: claiming shown on a selection that
+   * never happened is what leaves the runtime waiting on a panel that is not there.
+   */
+  readonly awaitSelection: (sessionId: string, timeoutMs?: number) => Promise<boolean>;
   /** The view is gone: nothing shows it any more, so stop counting it as shown. */
   readonly releaseShown: (pluginId: string) => void;
   /** Package lifecycle, for the catalogue's apps area. */
@@ -284,8 +293,24 @@ export interface WebuiMiniAppWorkflows {
   readonly uninstall: (pluginId: string) => Promise<void>;
 }
 
+/**
+ * The client's ordinary session selection, as the Mini App business follows it.
+ *
+ * Injected rather than discovered because selection belongs to the application
+ * store, and its owner is the shell's `select` command: that is what a rail click,
+ * a fork, an import and a delete all go through. A `hashchange` listener would miss
+ * every one of them — the rail selects through the store and `history.replaceState`,
+ * which fires no navigation event at all.
+ */
+export interface WebuiMiniAppSelectionSource {
+  readonly current: () => string | undefined;
+  /** Notified whenever the client's selection may have changed. */
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
 export function createWebuiMiniAppWorkflows(deps: {
   readonly port: WebuiMiniAppPortSlice;
+  readonly selection?: WebuiMiniAppSelectionSource;
 }): WebuiMiniAppWorkflows {
   const { port } = deps;
   const available =
@@ -598,6 +623,38 @@ export function createWebuiMiniAppWorkflows(deps: {
     void closeShown(shown);
   };
 
+  /**
+   * Resolve when the client's selection is (or becomes) `sessionId`.
+   *
+   * A subscription rather than a poll: the owner notifies, and the answer is the
+   * owner's state at that moment. The bound exists because a selection can be
+   * refused elsewhere (a session that no longer exists), and waiting forever would
+   * leave the page's `open` promise unsettled.
+   */
+  const awaitSelection: WebuiMiniAppWorkflows["awaitSelection"] = (sessionId, timeoutMs = 2_000) => {
+    const selection = deps.selection;
+    if (!selection) return Promise.resolve(false);
+    if (selection.current() === sessionId) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      let done = false;
+      let unsubscribe: () => void = () => undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (value: boolean): void => {
+        if (done) return;
+        done = true;
+        unsubscribe();
+        if (timer !== undefined) clearTimeout(timer);
+        resolve(value);
+      };
+      unsubscribe = selection.subscribe(() => {
+        if (selection.current() === sessionId) finish(true);
+      });
+      timer = setTimeout(() => finish(false), timeoutMs);
+      // The selection may have landed between the first read and the subscription.
+      if (selection.current() === sessionId) finish(true);
+    });
+  };
+
   const releaseShown: WebuiMiniAppWorkflows["releaseShown"] = (pluginId) => {
     const shown = state.agentShown;
     if (!shown || shown.pluginId !== pluginId) return;
@@ -617,6 +674,14 @@ export function createWebuiMiniAppWorkflows(deps: {
     }
     await loadListing();
   };
+
+  // Follow the selection owner: every change either keeps the shown session or
+  // closes its lease, which is the fact the runtime's approval router reads. The
+  // subscription lives as long as the store and this owner do, which is the
+  // application's own lifetime, so it is never released separately.
+  deps.selection?.subscribe(() => {
+    noteSelectedSession(deps.selection?.current());
+  });
 
   return {
     getSnapshot: () => state,
@@ -638,6 +703,7 @@ export function createWebuiMiniAppWorkflows(deps: {
     agentCall,
     reportShown,
     noteSelectedSession,
+    awaitSelection,
     releaseShown,
     setPluginEnabled: (pluginId, enabled) =>
       mutatePlugin(enabled ? "enablePlugin" : "disablePlugin", pluginId),

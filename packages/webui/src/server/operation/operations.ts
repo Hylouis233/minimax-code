@@ -30,6 +30,7 @@ import { createWorkspaceHandlerEntries } from "./handlers/workspace.js";
 import { createMiniAppHandlerEntries } from "./handlers/miniapp.js";
 import { createMiniAppAgentHandlerEntries } from "./handlers/miniapp-agent.js";
 import { createMiniAppAgentConnections } from "../miniapp/agent-connections.js";
+import { createMiniAppAgentPanels } from "../miniapp/agent-panels.js";
 import { createMiniAppAgentRuns } from "../miniapp/agent-runs.js";
 import { createTerminalHandlerEntries } from "./handlers/terminal.js";
 import {
@@ -109,6 +110,7 @@ export function createOperationRegistry(
    */
   const miniAppConnections = createMiniAppAgentConnections();
   const miniAppRuns = createMiniAppAgentRuns();
+  const miniAppPanels = createMiniAppAgentPanels();
   const entries = new Map<string, WebuiOperationRegistryEntry>([
     ...createBindingEntries(port),
     ...createWorkspaceHandlerEntries(),
@@ -119,10 +121,13 @@ export function createOperationRegistry(
     ...createMiniAppHandlerEntries(port, {
       ...(miniAppProxies ? { proxies: miniAppProxies } : {}),
       connections: miniAppConnections,
+      panels: miniAppPanels,
+      runs: miniAppRuns,
     }),
     ...createMiniAppAgentHandlerEntries(port, {
       connections: miniAppConnections,
       runs: miniAppRuns,
+      panels: miniAppPanels,
     }),
     ...(terminal ? createTerminalHandlerEntries(terminal) : []),
     ...(browser ? createBrowserHandlerEntries(browser, browserInstallationKeys) : []),

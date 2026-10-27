@@ -24,6 +24,7 @@
 // the real routing against a fake frame without a browser.
 
 import {
+  isMiniAppAgentFailureCode,
   isMiniAppAgentPermissionDecision,
   MINIAPP_AGENT_MAX_TEXT_LENGTH,
   readMiniAppAgentAnswers,
@@ -36,7 +37,6 @@ import {
 } from "@mavis/shared/miniapp-surface";
 
 import {
-  isWebuiMiniAppAgentFailureCode,
   isWebuiMiniAppAgentTurnMethod,
   readWebuiMiniAppAgentBridgeRequest,
   WEBUI_MINIAPP_AGENT_MAX_ID_LENGTH,
@@ -91,6 +91,15 @@ export interface WebuiMiniAppAgentBridgeHost {
    * check can compare it with the message's source.
    */
   readonly handleMessage: (event: WebuiMiniAppAgentBridgeEvent, frame: unknown) => void;
+  /**
+   * The framed document was replaced by a navigation.
+   *
+   * The page's pending map dies with it, so the turns it opened are cancelled
+   * through the service and detached here. Leaving them attached would keep the
+   * runtime counting a listener that no longer exists, and the replacement document
+   * would inherit a settlement addressed to nobody.
+   */
+  readonly handleDocumentReplaced: () => void;
   /** Detaches every turn this document had open and stops answering. */
   readonly close: () => void;
   /** The turn ids in flight, for teardown and for a test. */
@@ -157,39 +166,50 @@ export function createWebuiMiniAppAgentBridge(
     request: WebuiMiniAppAgentBridgeRequest,
     body: WebuiMiniAppAgentTurnRequest,
   ): void {
-    turns.set(
-      request.requestId,
-      input.commands.watchTurn(
-        body,
-        (frame) => {
-          if (frame.kind === "event") {
-            postToPage({
-              type: WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
-              requestId: request.requestId,
-              event: frame.event,
-            });
-            return;
-          }
-          turns.delete(request.requestId);
-          answer(
-            request.requestId,
-            frame.kind === "settled"
-              ? { ok: true, value: frame.result }
-              : { ok: false, code: frame.code, ...(frame.reason ? { reason: frame.reason } : {}) },
-          );
-        },
-        (error) => {
-          // A refused or broken stream: the runtime may have accepted the turn
-          // before the failure, so it is never reported as a clean rejection.
-          turns.delete(request.requestId);
-          const failureCode = (error as { code?: unknown } | undefined)?.code;
-          answer(request.requestId, {
-            ok: false,
-            code: isWebuiMiniAppAgentFailureCode(failureCode) ? failureCode : "result_unknown",
+    const requestId = request.requestId;
+    /**
+     * Whether the watch is still open.
+     *
+     * A watch can settle synchronously — a host with no capability, a view with no
+     * host session — and it settles before it has returned its detach. Recording
+     * the id first would leave a settled turn in flight, where it would answer a
+     * retry `busy` and forward a cancellation for a turn that never started.
+     */
+    let live = true;
+    const settle = (result: WebuiMiniAppAgentBridgeResult): void => {
+      live = false;
+      turns.delete(requestId);
+      answer(requestId, result);
+    };
+    const detach = input.commands.watchTurn(
+      body,
+      (frame) => {
+        if (frame.kind === "event") {
+          postToPage({
+            type: WEBUI_MINIAPP_BRIDGE_AGENT_EVENT,
+            requestId,
+            event: frame.event,
           });
-        },
-      ),
+          return;
+        }
+        settle(
+          frame.kind === "settled"
+            ? { ok: true, value: frame.result }
+            : { ok: false, code: frame.code, ...(frame.reason ? { reason: frame.reason } : {}) },
+        );
+      },
+      (error) => {
+        // A refused or broken stream: the runtime may have accepted the turn before
+        // the failure, so it is never reported as a clean rejection.
+        const failureCode = (error as { code?: unknown } | undefined)?.code;
+        settle({
+          ok: false,
+          code: isMiniAppAgentFailureCode(failureCode) ? failureCode : "result_unknown",
+        });
+      },
     );
+    if (live) turns.set(requestId, detach);
+    else detach();
   }
 
   /** Turns one page payload into the wire body the service validates. */
@@ -318,7 +338,7 @@ export function createWebuiMiniAppAgentBridge(
         answer(
           request.requestId,
           response.ok
-            ? { ok: true, value: response }
+            ? { ok: true, value: pageValueOf(response) }
             : {
                 ok: false,
                 code: response.code,
@@ -349,6 +369,21 @@ export function createWebuiMiniAppAgentBridge(
       const request = readWebuiMiniAppAgentBridgeRequest(event.data);
       if (request) dispatch(request);
     },
+    handleDocumentReplaced() {
+      if (closed) return;
+      // Cancel before detaching: the service settles the abort and frees the id, so
+      // the replacement document cannot inherit a turn it never opened.
+      for (const requestId of [...turns.keys()]) {
+        void input.commands
+          .call({
+            ...base(requestId),
+            method: "cancel",
+          })
+          .catch(() => undefined);
+      }
+      for (const detach of turns.values()) detach();
+      turns.clear();
+    },
     close() {
       if (closed) return;
       closed = true;
@@ -357,4 +392,30 @@ export function createWebuiMiniAppAgentBridge(
     },
     inFlight: () => [...turns.keys()],
   };
+}
+
+/**
+ * What a page's method resolves.
+ *
+ * The shipped preload resolves the payload of a call, not the envelope around it:
+ * `models()` answers the catalogue with its default, `agents()` answers the agent
+ * list, `create()` answers the created session, and the calls with nothing to
+ * return answer nothing. A page written against the desktop client destructures
+ * those values, so an extra layer here is a page that breaks on its first line.
+ */
+function pageValueOf(
+  response: Extract<WebuiMiniAppAgentCallResponse, { readonly ok: true }>,
+): unknown {
+  switch (response.method) {
+    case "models":
+      return response.models;
+    case "agents":
+      return response.agents;
+    case "create":
+      return { sessionId: response.sessionId };
+    default:
+      // `open`, `reply`, the two panel reports and `cancel` settle with nothing to
+      // read, exactly as the preload's `invoke` returns for them.
+      return undefined;
+  }
 }

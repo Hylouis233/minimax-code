@@ -498,7 +498,8 @@
       "packages/webui/test/unit/miniapp-presentation-lease.test.ts",
       "packages/webui/test/unit/miniapp-standalone-route.test.ts",
       "packages/webui/test/unit/miniapp-surfaces.test.tsx",
-      "packages/webui/test/unit/miniapp-agent-bridge.test.ts"
+      "packages/webui/test/unit/miniapp-agent-bridge.test.ts",
+      "packages/webui/test/integration/miniapp-agent-loopback.test.ts"
     ]
   }
 }

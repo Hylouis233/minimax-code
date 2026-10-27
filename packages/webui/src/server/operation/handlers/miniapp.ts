@@ -40,6 +40,8 @@ import {
   createMiniAppAgentConnections,
   type MiniAppAgentConnections,
 } from "../../miniapp/agent-connections.js";
+import { createMiniAppAgentPanels, type MiniAppAgentPanels } from "../../miniapp/agent-panels.js";
+import { createMiniAppAgentRuns, type MiniAppAgentRuns } from "../../miniapp/agent-runs.js";
 import { miniAppPageBridge } from "../../miniapp/bridge.js";
 import type {
   WebuiMiniAppCatalogue,
@@ -120,6 +122,13 @@ export interface MiniAppHandlerOptions {
    * with none, this handler keeps a private one, which is what a test gets.
    */
   readonly connections?: MiniAppAgentConnections;
+  /**
+   * The sessions the runtime was told are shown, and the turns this service is
+   * following. A stop closes the first and cancels the second before it revokes the
+   * generation, because after the revoke neither report can be delivered.
+   */
+  readonly panels?: MiniAppAgentPanels;
+  readonly runs?: MiniAppAgentRuns;
 }
 
 /**
@@ -209,6 +218,8 @@ export function createMiniAppHandlerEntries(
   const presentations = createMiniAppPresentationLeases();
   /** Which generation of each plugin's page is the one being served. */
   const connections = options.connections ?? createMiniAppAgentConnections();
+  const panels = options.panels ?? createMiniAppAgentPanels();
+  const runs = options.runs ?? createMiniAppAgentRuns();
 
   /**
    * Whether the deep link's session is still there.
@@ -365,16 +376,33 @@ export function createMiniAppHandlerEntries(
   ) => {
     const miniApps = requireMiniApps(port);
     return serialised(body.pluginId, async () => {
-      // The runtime first: a proxy closed under a live app would leave the app
-      // running with nothing pointing at it, and a stop that throws leaves the
-      // listener where it was so a retry has something to close.
+      /**
+       * The order is the point.
+       *
+       * 1. Close every panel this service told the runtime was on screen, while the
+       *    generation that authorises the report is still current. A record left
+       *    behind keeps a session's permission asks answerable, and after the revoke
+       *    below the client could never withdraw it.
+       * 2. Cancel the turns this client is following, so they settle as aborted
+       *    instead of waiting for a stream the stop is about to close.
+       * 3. Stop the runtime, close the listener, and only then revoke the
+       *    generation: the page is gone with its listener, so nothing may act as
+       *    this plugin any more and the next start is a new generation.
+       */
+      for (const panel of panels.take(body.pluginId)) {
+        await port
+          .panelClosedMiniAppAgentSession?.({
+            sessionId: panel.sessionId,
+            hostSessionId: panel.hostSessionId,
+          })
+          .catch(() => undefined);
+      }
+      runs.cancelPlugin(body.pluginId);
       await miniApps.stop.call(port, {
         pluginId: body.pluginId,
         signal: context.signal,
       });
       await closeProxy(body.pluginId);
-      // The page is gone with its listener, so nothing may act as this plugin any
-      // more: the next start is a new generation and a stale request fails closed.
       connections.revoke(body.pluginId);
       return { body: { success: true as const } };
     });

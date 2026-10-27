@@ -6,22 +6,42 @@
 // half is the real host (`application/miniapp-agent-bridge.ts`). Frames travel the
 // way they do in a browser — the page posts to its parent, the host posts back to
 // the frame — so these cases exercise source and origin checks, request-id
-// correlation, event delivery, cancellation and teardown rather than a stub of
-// them.
+// correlation, event delivery, cancellation, navigation fencing and teardown rather
+// than a stub of them.
 //
 // On the other side of the host the commands are scripted, and the operations are
 // driven through their real handlers against a scripted port, so what a case
-// asserts is what reached the runtime: which caller, which generation, and whether
-// a listener was attached (`observe`).
+// asserts is what reached the runtime: which caller, which generation, whether a
+// listener was attached, and whether a run was aborted. The shown/closed lifecycle
+// is driven through the application's real session store, and the approval rule at
+// the end runs the runtime's real gateway — the component that decides whether a
+// Mini App ask can be answered.
 import vm from "node:vm";
 
 import { describe, expect, it, vi } from "vitest";
+import type {
+  MiniAppAgentModelSelection,
+  MiniAppAgentRunEvent,
+  MiniAppAgentRunResult,
+} from "@mavis/shared/miniapp-surface";
+
+// The approval gateway is not one of the runtime package's published entry points,
+// and this is the only way to exercise the rule the ticket's AC6 names without
+// booting a whole runtime host: the module is imported directly, from a test, and
+// nothing under `src/` reaches it.
+import { createMiniAppAgentGateway } from "../../../local-runtime-v2/src/service/miniapp/agent/gateway.js";
 
 import { miniAppPageBridge } from "../../src/server/miniapp/bridge.js";
-import { createWebuiMiniAppAgentBridge } from "../../src/client/features/miniapp/application/miniapp-agent-bridge.js";
+import {
+  createWebuiMiniAppAgentBridge,
+  type WebuiMiniAppAgentBridgeHost,
+} from "../../src/client/features/miniapp/application/miniapp-agent-bridge.js";
+import { createWebuiSessionStore } from "../../src/client/application/session-store.js";
 import { createMiniAppAgentConnections } from "../../src/server/miniapp/agent-connections.js";
+import { createMiniAppAgentPanels } from "../../src/server/miniapp/agent-panels.js";
 import { createMiniAppAgentRuns } from "../../src/server/miniapp/agent-runs.js";
 import { createMiniAppAgentHandlerEntries } from "../../src/server/operation/handlers/miniapp-agent.js";
+import { createMiniAppHandlerEntries } from "../../src/server/operation/handlers/miniapp.js";
 import { createWebuiMiniAppWorkflows } from "../../src/client/features/miniapp/application/miniapp-workflows.js";
 import type {
   WebuiMiniAppAgentCallRequest,
@@ -30,21 +50,17 @@ import type {
 } from "../../src/shared/contracts/miniapp-agent.js";
 import type { WebuiMiniAppPortSlice } from "../../src/client/features/miniapp/application/miniapp-workflows.js";
 import type { WebuiHarnessPort } from "../../src/runtime/port.js";
-import type {
-  MiniAppAgentModelSelection,
-  MiniAppAgentRunEvent,
-  MiniAppAgentRunResult,
-} from "@mavis/shared/miniapp-surface";
 
 const VIEW_URL = "http://127.0.0.1:49152/";
 const ORIGIN = "http://127.0.0.1:49152";
 const PLUGIN = "demo.miniapp";
 const HOST_SESSION = "session-host";
+const MINI_SESSION = "session-mini";
 
 interface PageHarness {
   readonly agent: Record<string, (...args: unknown[]) => Promise<unknown>>;
-  /** Every frame the page posted to its parent. */
-  readonly sentToParent: readonly Record<string, unknown>[];
+  /** Every frame the page posted to its parent, until `deliver` drains them. */
+  readonly sentToParent: Record<string, unknown>[];
   /** Delivers a frame from the client into the page. */
   readonly deliver: (data: unknown) => void;
   /** The page's own window, which is also its parent's child. */
@@ -83,50 +99,108 @@ function openPage(): PageHarness {
     console,
   });
   vm.runInContext(miniAppPageBridge().script, context);
-  const mcode = pageWindow.mcode as { miniapp: { agent: Record<string, (...a: unknown[]) => Promise<unknown>> } };
+  const mcode = pageWindow.mcode as {
+    miniapp: { agent: Record<string, (...a: unknown[]) => Promise<unknown>> };
+  };
   return {
     agent: mcode.miniapp.agent,
     sentToParent,
     window: pageWindow,
     deliver: (data) => {
-      for (const listener of listeners) listener({ source: pageWindow.parent, data });
+      // `postMessage` structured-clones across the realm boundary, so a payload the
+      // page built is a plain object of the *host's* realm when it arrives. The
+      // clone here is that boundary: without it a reader that tests the prototype
+      // would reject the page's own object for being foreign.
+      const cloned = structuredClone(data);
+      for (const listener of listeners) listener({ source: pageWindow.parent, data: cloned });
     },
   };
 }
 
-/** Runs the loop that carries the page's frames to the host until it settles. */
-async function pump(
-  page: PageHarness,
-  host: ReturnType<typeof createWebuiMiniAppAgentBridge>,
-  frame: unknown,
-  until: () => boolean,
-): Promise<void> {
-  for (let tick = 0; tick < 50; tick += 1) {
-    await Promise.resolve();
-    const pending = page.sentToParent.length;
-    for (const data of page.sentToParent) {
-      host.handleMessage({ data, origin: ORIGIN, source: page.window }, frame);
-    }
-    // Frames are consumed once; draining keeps the loop from re-dispatching them.
-    (page.sentToParent as Record<string, unknown>[]).length = 0;
-    if (until()) return;
-    if (pending === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+/** Carries every frame the page has posted so far to the host, once. */
+function deliver(page: PageHarness, host: WebuiMiniAppAgentBridgeHost): void {
+  const frames = [...page.sentToParent];
+  page.sentToParent.length = 0;
+  for (const data of frames) {
+    // The same realm boundary in the other direction: what the host receives is a
+    // clone of the page's object, not the page's object.
+    host.handleMessage(
+      { data: structuredClone(data), origin: ORIGIN, source: page.window },
+      page.window,
+    );
   }
 }
 
-/**
- * A port with all nine agent members, so a case can vary the one it cares about.
- *
- * The capability is all-or-nothing by design: the runtime composes the nine from
- * one application cell, so the handler refuses every one of them when a member is
- * missing rather than half-answering.
- */
+/** Lets the promise chains a dispatch starts run to completion. */
+async function settle(): Promise<void> {
+  for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+}
+
+function turnResult(overrides: Partial<MiniAppAgentRunResult> = {}): MiniAppAgentRunResult {
+  return {
+    sessionId: MINI_SESSION,
+    turnId: "turn-1",
+    status: "finished",
+    text: "done",
+    ...overrides,
+  };
+}
+
+interface Harness {
+  readonly page: PageHarness;
+  readonly host: WebuiMiniAppAgentBridgeHost;
+  readonly calls: WebuiMiniAppAgentCallRequest[];
+  readonly turns: WebuiMiniAppAgentTurnRequest[];
+}
+
+/** One page, one host, with scripted commands whose behaviour a case varies. */
+function bridgeHarness(
+  options: {
+    readonly onWatch?: (
+      request: WebuiMiniAppAgentTurnRequest,
+      onFrame: (frame: WebuiMiniAppAgentTurnFrame) => void,
+      onFailure: (error: Error) => void,
+    ) => (() => void) | "sync-failure";
+  } = {},
+): Harness {
+  const page = openPage();
+  const calls: WebuiMiniAppAgentCallRequest[] = [];
+  const turns: WebuiMiniAppAgentTurnRequest[] = [];
+  const host = createWebuiMiniAppAgentBridge({
+    pluginId: PLUGIN,
+    hostSessionId: HOST_SESSION,
+    connection: 1,
+    viewUrl: VIEW_URL,
+    post: (message) => page.deliver(message),
+    commands: {
+      call: async (request) => {
+        calls.push(request);
+        return { ok: true, method: "cancel" } as never;
+      },
+      watchTurn: (request, onFrame, onFailure) => {
+        turns.push(request);
+        const watch = options.onWatch?.(request, onFrame, onFailure);
+        if (watch === "sync-failure") {
+          onFailure(
+            Object.assign(new Error("runtime_unavailable"), { code: "runtime_unavailable" }),
+          );
+          return () => undefined;
+        }
+        return watch ?? (() => undefined);
+      },
+    },
+  });
+  return { page, host, calls, turns };
+}
+
 function agentPort(overrides: Partial<Record<string, unknown>> = {}): WebuiHarnessPort {
   return {
     runMiniAppAgentTurn: async () => turnResult(),
     answerMiniAppAgentQuestion: async () => turnResult(),
     replyMiniAppAgentPermission: async () => undefined,
-    openMiniAppAgentSession: async () => ({ sessionId: "session-mini", hostSessionId: HOST_SESSION }),
+    openMiniAppAgentSession: async () => ({ sessionId: MINI_SESSION, hostSessionId: HOST_SESSION }),
     panelOpenedMiniAppAgentSession: async () => undefined,
     panelClosedMiniAppAgentSession: async () => undefined,
     listMiniAppAgentModels: async () => ({
@@ -134,77 +208,180 @@ function agentPort(overrides: Partial<Record<string, unknown>> = {}): WebuiHarne
       default: { providerId: "p", modelId: "m" } satisfies MiniAppAgentModelSelection,
     }),
     listMiniAppAgentAgents: async () => ({ agents: [] }),
-    createMiniAppAgentSession: async () => ({ sessionId: "session-mini" }),
+    createMiniAppAgentSession: async () => ({ sessionId: MINI_SESSION }),
     ...overrides,
   } as unknown as WebuiHarnessPort;
 }
 
-function turnResult(overrides: Partial<MiniAppAgentRunResult> = {}): MiniAppAgentRunResult {
-  return { sessionId: "session-mini", turnId: "turn-1", status: "finished", text: "done", ...overrides };
+/** The three registries one service shares between its two handler sets. */
+function registries() {
+  return {
+    connections: createMiniAppAgentConnections(),
+    runs: createMiniAppAgentRuns(),
+    panels: createMiniAppAgentPanels(),
+  };
 }
+
+const BODY = {
+  pluginId: PLUGIN,
+  hostSessionId: HOST_SESSION,
+  connection: 1,
+  requestId: "req-1",
+  method: "run" as const,
+  observe: true,
+  text: "hello",
+};
 
 describe("the page bridge's agent block", () => {
   it("carries a run's events and its settlement back to the page that asked", async () => {
-    const page = openPage();
-    const frames: WebuiMiniAppAgentTurnFrame[] = [
-      { kind: "event", event: { type: "turn.started", sessionId: "session-mini", turnId: "turn-1", model: { providerId: "p", modelId: "m" } } },
-      { kind: "event", event: { type: "text.delta", sessionId: "session-mini", turnId: "turn-1", text: "hel" } },
-      { kind: "settled", result: turnResult() },
-    ];
-    let request: WebuiMiniAppAgentTurnRequest | undefined;
-    const host = createWebuiMiniAppAgentBridge({
-      pluginId: PLUGIN,
-      hostSessionId: HOST_SESSION,
-      connection: 3,
-      viewUrl: VIEW_URL,
-      post: (message) => page.deliver(message),
-      commands: {
-        call: async () => ({ ok: true, method: "cancel" }),
-        watchTurn: (asked, onFrame) => {
-          request = asked;
-          for (const frame of frames) onFrame(frame);
-          return () => undefined;
-        },
+    const harness = bridgeHarness({
+      onWatch: (_request, onFrame) => {
+        onFrame({
+          kind: "event",
+          event: {
+            type: "turn.started",
+            sessionId: MINI_SESSION,
+            turnId: "turn-1",
+            model: { providerId: "p", modelId: "m" },
+          },
+        });
+        onFrame({
+          kind: "event",
+          event: { type: "text.delta", sessionId: MINI_SESSION, turnId: "turn-1", text: "hel" },
+        });
+        onFrame({ kind: "settled", result: turnResult() });
+        return () => undefined;
       },
     });
 
     const seen: MiniAppAgentRunEvent[] = [];
-    const settled = page.agent.run({ text: "hello" }, { onEvent: (event: MiniAppAgentRunEvent) => seen.push(event) });
-    await pump(page, host, page.window, () => false);
-    const result = await settled;
+    const running = harness.page.agent.run(
+      { text: "hello" },
+      { onEvent: (event: MiniAppAgentRunEvent) => seen.push(event) },
+    );
+    deliver(harness.page, harness.host);
+    const result = await running;
 
-    expect(request?.text).toBe("hello");
-    expect(request?.observe).toBe(true);
+    expect(harness.turns[0]?.text).toBe("hello");
+    expect(harness.turns[0]?.observe).toBe(true);
     // The identity the page never supplied, resolved by the view.
-    expect(request?.pluginId).toBe(PLUGIN);
-    expect(request?.hostSessionId).toBe(HOST_SESSION);
-    expect(request?.connection).toBe(3);
+    expect(harness.turns[0]?.pluginId).toBe(PLUGIN);
+    expect(harness.turns[0]?.hostSessionId).toBe(HOST_SESSION);
+    expect(harness.turns[0]?.connection).toBe(1);
     expect(seen.map((event) => event.type)).toEqual(["turn.started", "text.delta"]);
-    expect(result).toMatchObject({ sessionId: "session-mini", status: "finished", text: "done" });
+    expect(result).toMatchObject({ sessionId: MINI_SESSION, status: "finished", text: "done" });
   });
 
-  it("ignores a message that did not come from the frame this view framed", async () => {
-    const page = openPage();
+  it("ignores a message that did not come from the frame this view framed", () => {
     const watchTurn = vi.fn(() => () => undefined);
-    const host = createWebuiMiniAppAgentBridge({
-      pluginId: PLUGIN,
-      hostSessionId: HOST_SESSION,
-      connection: 1,
-      viewUrl: VIEW_URL,
-      post: (message) => page.deliver(message),
-      commands: { call: async () => ({ ok: true, method: "cancel" }), watchTurn },
-    });
-
-    const foreign = { type: "mcode:miniapp:agent-request", requestId: "r-1", method: "run", payload: { text: "hi" }, observe: true };
-    // A second window on the same origin, and this page's own window under another origin.
-    host.handleMessage({ data: foreign, origin: ORIGIN, source: { other: true } }, page.window);
-    host.handleMessage({ data: foreign, origin: "http://evil.test", source: page.window }, page.window);
+    const harness = bridgeHarness({ onWatch: watchTurn });
+    const foreign = {
+      type: "mcode:miniapp:agent-request",
+      requestId: "r-1",
+      method: "run",
+      payload: { text: "hi" },
+      observe: true,
+    };
+    // A second window on the same origin, and this page's own window under another.
+    harness.host.handleMessage(
+      { data: foreign, origin: ORIGIN, source: { other: true } },
+      harness.page.window,
+    );
+    harness.host.handleMessage(
+      { data: foreign, origin: "http://evil.test", source: harness.page.window },
+      harness.page.window,
+    );
     expect(watchTurn).not.toHaveBeenCalled();
   });
 
-  it("answers a second request that reuses a live id with busy", async () => {
+  it("answers a second run reusing a live page request id with busy", async () => {
+    const harness = bridgeHarness();
+    const first = harness.page.agent.run({ text: "one", requestId: "same" });
+    deliver(harness.page, harness.host);
+    expect(harness.host.inFlight()).toEqual(["same"]);
+
+    // The page's own second call on its own live id: the duplicate guard is what
+    // turns this into `busy` instead of a second watch on the same id.
+    const second = harness.page.agent.run({ text: "two", requestId: "same" });
+    deliver(harness.page, harness.host);
+    await expect(second).rejects.toThrow("busy");
+
+    expect(harness.turns).toHaveLength(1);
+    expect(harness.host.inFlight()).toEqual(["same"]);
+    first.catch(() => undefined);
+  });
+
+  it("cancels a live turn through the service when the page asks", async () => {
+    const harness = bridgeHarness();
+    const running = harness.page.agent.run({ text: "long" }, { onEvent: () => undefined });
+    deliver(harness.page, harness.host);
+
+    harness.page.agent.cancel(harness.host.inFlight()[0] as string);
+    deliver(harness.page, harness.host);
+    await settle();
+
+    expect(harness.calls.map((call) => call.method)).toEqual(["cancel"]);
+    expect(harness.calls[0]?.requestId).toBe(harness.turns[0]?.requestId);
+    running.catch(() => undefined);
+  });
+
+  it("frees the id when a watch fails synchronously, and accepts a retry", async () => {
+    // Only the first attempt is refused: the retry is the case that would be stuck
+    // as `busy` if the refusal had left its id in flight.
+    let attempts = 0;
+    const harness = bridgeHarness({
+      onWatch: () => {
+        attempts += 1;
+        return attempts === 1 ? "sync-failure" : () => undefined;
+      },
+    });
+
+    const refused = harness.page.agent.run({ text: "first", requestId: "retry" });
+    deliver(harness.page, harness.host);
+    await expect(refused).rejects.toThrow("runtime_unavailable");
+    // The failure arrived before the watch returned its detach: nothing may stay in
+    // flight, or the retry below would be answered `busy` for a turn never started.
+    expect(harness.host.inFlight()).toEqual([]);
+
+    const retried = harness.page.agent.run({ text: "second", requestId: "retry" });
+    deliver(harness.page, harness.host);
+    expect(harness.turns).toHaveLength(2);
+    expect(harness.host.inFlight()).toEqual(["retry"]);
+    retried.catch(() => undefined);
+  });
+
+  it("cancels the old generation's turns when the page navigates", async () => {
+    const harness = bridgeHarness();
+    const running = harness.page.agent.run({ text: "long" }, { onEvent: () => undefined });
+    deliver(harness.page, harness.host);
+    const requestId = harness.host.inFlight()[0] as string;
+
+    harness.host.handleDocumentReplaced();
+    await settle();
+
+    expect(harness.calls.map((call) => call.method)).toEqual(["cancel"]);
+    expect(harness.calls[0]?.requestId).toBe(requestId);
+    expect(harness.host.inFlight()).toEqual([]);
+
+    // The replacement document starts from nothing: an id it picks is free.
+    const replacement = harness.page.agent.run(
+      { text: "again", requestId: "fresh" },
+      { onEvent: () => undefined },
+    );
+    deliver(harness.page, harness.host);
+    expect(harness.host.inFlight()).toEqual(["fresh"]);
+    running.catch(() => undefined);
+    replacement.catch(() => undefined);
+  });
+
+  it("resolves the payload each call answers with, as the shipped page API does", async () => {
+    const models = {
+      models: [{ providerId: "p", modelId: "m", displayName: "M" }],
+      default: { providerId: "p", modelId: "m" } satisfies MiniAppAgentModelSelection,
+      host: { providerId: "p", modelId: "m" } satisfies MiniAppAgentModelSelection,
+    };
+    const agents = { agents: [{ name: "mavis", displayName: "Mavis", primary: true }] };
     const page = openPage();
-    let release: (() => void) | undefined;
     const host = createWebuiMiniAppAgentBridge({
       pluginId: PLUGIN,
       hostSessionId: HOST_SESSION,
@@ -212,105 +389,92 @@ describe("the page bridge's agent block", () => {
       viewUrl: VIEW_URL,
       post: (message) => page.deliver(message),
       commands: {
-        call: async () => ({ ok: true, method: "cancel" }),
-        watchTurn: () => {
-          release = () => undefined;
-          return () => undefined;
-        },
-      },
-    });
-
-    const first = page.agent.run({ text: "one", requestId: "same" });
-    await pump(page, host, page.window, () => false);
-    const duplicate = { type: "mcode:miniapp:agent-request", requestId: "same", method: "run", payload: { text: "two" }, observe: true };
-    host.handleMessage({ data: duplicate, origin: ORIGIN, source: page.window }, page.window);
-    await expect(duplicate).toBeDefined();
-    expect(host.inFlight()).toEqual(["same"]);
-    release?.();
-    void first.catch(() => undefined);
-  });
-
-  it("settles a cancelled turn as cancelled, never as a clean result", async () => {
-    const page = openPage();
-    const calls: WebuiMiniAppAgentCallRequest[] = [];
-    let settleTurn: ((frame: WebuiMiniAppAgentTurnFrame) => void) | undefined;
-    const host = createWebuiMiniAppAgentBridge({
-      pluginId: PLUGIN,
-      hostSessionId: HOST_SESSION,
-      connection: 2,
-      viewUrl: VIEW_URL,
-      post: (message) => page.deliver(message),
-      commands: {
         call: async (request) => {
-          calls.push(request);
-          return { ok: true, method: "cancel" };
+          switch (request.method) {
+            case "models":
+              return { ok: true, method: "models", models };
+            case "agents":
+              return { ok: true, method: "agents", agents };
+            case "create":
+              return { ok: true, method: "create", sessionId: MINI_SESSION };
+            case "open":
+              return {
+                ok: true,
+                method: "open",
+                sessionId: MINI_SESSION,
+                hostSessionId: HOST_SESSION,
+              };
+            default:
+              return { ok: true, method: "reply" };
+          }
         },
-        watchTurn: (_request, onFrame) => {
-          settleTurn = onFrame;
-          return () => undefined;
-        },
+        watchTurn: () => () => undefined,
       },
     });
 
-    const running = page.agent.run({ text: "long" }, { onEvent: () => undefined });
-    await pump(page, host, page.window, () => false);
-    page.agent.cancel(host.inFlight()[0] as string);
-    await pump(page, host, page.window, () => false);
+    const askingModels = page.agent.models();
+    deliver(page, host);
+    // `const { models, default: model } = await …models()` must work as it does on
+    // the desktop client: the envelope around the payload is the host's business.
+    await expect(askingModels).resolves.toEqual(models);
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.method).toBe("cancel");
-    // The service settles the abort; the page learns the code from that frame.
-    settleTurn?.({ kind: "failure", code: "cancelled" });
-    await expect(running).rejects.toThrow("cancelled");
+    const askingAgents = page.agent.agents();
+    deliver(page, host);
+    await expect(askingAgents).resolves.toEqual(agents);
+
+    const creating = page.agent.create();
+    deliver(page, host);
+    await expect(creating).resolves.toEqual({ sessionId: MINI_SESSION });
+
+    const opening = page.agent.open(MINI_SESSION);
+    deliver(page, host);
+    await expect(opening).resolves.toBeUndefined();
+
+    const replying = page.agent.reply({
+      sessionId: MINI_SESSION,
+      requestId: "perm-1",
+      decision: "deny",
+    });
+    deliver(page, host);
+    await expect(replying).resolves.toBeUndefined();
   });
 
   it("carries a permission decision and a questionnaire answer with the page's ids", async () => {
-    const page = openPage();
-    const calls: WebuiMiniAppAgentCallRequest[] = [];
-    const turns: WebuiMiniAppAgentTurnRequest[] = [];
-    const host = createWebuiMiniAppAgentBridge({
-      pluginId: PLUGIN,
-      hostSessionId: HOST_SESSION,
-      connection: 4,
-      viewUrl: VIEW_URL,
-      post: (message) => page.deliver(message),
-      commands: {
-        call: async (request) => {
-          calls.push(request);
-          return { ok: true, method: "reply" };
-        },
-        watchTurn: (request, onFrame) => {
-          turns.push(request);
-          onFrame({ kind: "settled", result: turnResult() });
-          return () => undefined;
-        },
+    const harness = bridgeHarness({
+      onWatch: (_request, onFrame) => {
+        onFrame({ kind: "settled", result: turnResult() });
+        return () => undefined;
       },
     });
 
-    const replied = page.agent.reply({ sessionId: "session-mini", requestId: "perm-1", decision: "allowOnce" });
-    await pump(page, host, page.window, () => false);
+    const replied = harness.page.agent.reply({
+      sessionId: MINI_SESSION,
+      requestId: "perm-1",
+      decision: "allowOnce",
+    });
+    deliver(harness.page, harness.host);
     await replied;
 
-    const answered = page.agent.answer(
+    const answered = harness.page.agent.answer(
       {
-        sessionId: "session-mini",
+        sessionId: MINI_SESSION,
         questionId: "q-1",
         answers: [{ stepId: "s1", selectedOptionIds: ["yes"], selectedOther: false }],
       },
       { onEvent: () => undefined },
     );
-    await pump(page, host, page.window, () => false);
+    deliver(harness.page, harness.host);
     await answered;
 
-    expect(calls[0]).toMatchObject({
+    expect(harness.calls[0]).toMatchObject({
       method: "reply",
-      targetSessionId: "session-mini",
+      targetSessionId: MINI_SESSION,
       questionRequestId: "perm-1",
       decision: "allowOnce",
     });
-    expect(turns[0]).toMatchObject({
+    expect(harness.turns[0]).toMatchObject({
       method: "answer",
-      targetSessionId: "session-mini",
+      targetSessionId: MINI_SESSION,
       questionRequestId: "q-1",
       observe: true,
     });
@@ -318,26 +482,16 @@ describe("the page bridge's agent block", () => {
 });
 
 describe("the agent operations at the service boundary", () => {
-  const body = {
-    pluginId: PLUGIN,
-    hostSessionId: HOST_SESSION,
-    connection: 1,
-    requestId: "req-1",
-    method: "run" as const,
-    observe: true,
-    text: "hello",
-  };
-
   it("reaches the runtime with the launch's process generation as the caller", async () => {
-    const connections = createMiniAppAgentConnections();
+    const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-7" });
     const runMiniAppAgentTurn = vi.fn(async () => turnResult());
     const entries = createMiniAppAgentHandlerEntries(agentPort({ runMiniAppAgentTurn }), {
       connections,
-      runs: createMiniAppAgentRuns(),
+      runs,
+      panels,
     });
-    const handle = entries.get("watchMiniAppAgentTurn")!;
-    const outcome = (await handle.handle({ requestId: "wire-1" }, body)) as {
+    const outcome = (await entries.get("watchMiniAppAgentTurn")!.handle({ requestId: "wire-1" }, BODY)) as {
       stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> };
     };
     const frames: WebuiMiniAppAgentTurnFrame[] = [];
@@ -354,7 +508,7 @@ describe("the agent operations at the service boundary", () => {
   });
 
   it("attaches a listener only when the page asked to observe", async () => {
-    const connections = createMiniAppAgentConnections();
+    const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-1" });
     const calls: Record<string, unknown>[] = [];
     const entries = createMiniAppAgentHandlerEntries(
@@ -364,13 +518,13 @@ describe("the agent operations at the service boundary", () => {
           return turnResult();
         },
       }),
-      { connections, runs: createMiniAppAgentRuns() },
+      { connections, runs, panels },
     );
     const handle = entries.get("watchMiniAppAgentTurn")!;
     for (const observe of [true, false]) {
       const outcome = (await handle.handle(
         { requestId: `wire-${String(observe)}` },
-        { ...body, observe, requestId: `req-${String(observe)}` },
+        { ...BODY, observe, requestId: `req-${String(observe)}` },
       )) as { stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> } };
       for await (const frame of outcome.stream.source) void frame;
     }
@@ -379,16 +533,17 @@ describe("the agent operations at the service boundary", () => {
   });
 
   it("refuses a stale presentation generation and never calls the runtime", async () => {
-    const connections = createMiniAppAgentConnections();
+    const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-1" });
     const runMiniAppAgentTurn = vi.fn();
-    const entries = createMiniAppAgentHandlerEntries(
-      { runMiniAppAgentTurn } as unknown as WebuiHarnessPort,
-      { connections, runs: createMiniAppAgentRuns() },
-    );
+    const entries = createMiniAppAgentHandlerEntries(agentPort({ runMiniAppAgentTurn }), {
+      connections,
+      runs,
+      panels,
+    });
     const outcome = (await entries
       .get("watchMiniAppAgentTurn")!
-      .handle({ requestId: "wire" }, { ...body, connection: 99 })) as {
+      .handle({ requestId: "wire" }, { ...BODY, connection: 99 })) as {
       stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> };
     };
     const frames: WebuiMiniAppAgentTurnFrame[] = [];
@@ -398,11 +553,12 @@ describe("the agent operations at the service boundary", () => {
   });
 
   it("answers a documented code when the host cannot serve the method", async () => {
-    const connections = createMiniAppAgentConnections();
+    const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-1" });
     const entries = createMiniAppAgentHandlerEntries({} as WebuiHarnessPort, {
       connections,
-      runs: createMiniAppAgentRuns(),
+      runs,
+      panels,
     });
     const response = (await entries.get("miniAppAgentCall")!.handle(
       { requestId: "wire" },
@@ -415,6 +571,52 @@ describe("the agent operations at the service boundary", () => {
       },
     )) as { body: { ok: boolean; code?: string } };
     expect(response.body).toEqual({ ok: false, code: "runtime_unavailable" });
+  });
+
+  it("aborts a followed turn when the cancel operation names it", async () => {
+    const { connections, runs, panels } = registries();
+    connections.register({ pluginId: PLUGIN, runId: "gen-1" });
+    const signals: (AbortSignal | undefined)[] = [];
+    const entries = createMiniAppAgentHandlerEntries(
+      agentPort({
+        runMiniAppAgentTurn: ({ signal }: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            signals.push(signal);
+            signal?.addEventListener("abort", () =>
+              reject(Object.assign(new Error("aborted"), { code: "REQUEST_CANCELLED" })),
+            );
+          }),
+      }),
+      { connections, runs, panels },
+    );
+
+    const outcome = (await entries.get("watchMiniAppAgentTurn")!.handle({ requestId: "wire" }, BODY)) as {
+      stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> };
+    };
+    const frames: WebuiMiniAppAgentTurnFrame[] = [];
+    const consuming = (async () => {
+      for await (const frame of outcome.stream.source) frames.push(frame);
+    })();
+    await settle();
+    expect(runs.size()).toBe(1);
+
+    const cancelled = (await entries.get("miniAppAgentCall")!.handle(
+      { requestId: "wire-2" },
+      {
+        pluginId: PLUGIN,
+        hostSessionId: HOST_SESSION,
+        connection: 1,
+        requestId: BODY.requestId,
+        method: "cancel",
+      },
+    )) as { body: { ok: boolean; method?: string } };
+
+    await consuming;
+    expect(cancelled.body).toEqual({ ok: true, method: "cancel" });
+    expect(signals[0]?.aborted).toBe(true);
+    // The settlement is the abort, not a clean result, and the id is released.
+    expect(frames).toEqual([{ kind: "failure", code: "cancelled" }]);
+    expect(runs.size()).toBe(0);
   });
 });
 
@@ -431,35 +633,75 @@ describe("the shown presentation", () => {
       miniAppAgentCall: async (request) => {
         calls.push(request);
         if (request.method === "open") {
-          return { ok: true, method: "open", sessionId: request.targetSessionId ?? "", hostSessionId: HOST_SESSION };
+          return {
+            ok: true,
+            method: "open",
+            sessionId: request.targetSessionId ?? "",
+            hostSessionId: HOST_SESSION,
+          };
         }
         return { ok: true, method: request.method as "panelOpened" };
       },
     } as WebuiMiniAppPortSlice;
   }
 
-  it("reports shown only after the client selected it, and closed when the person leaves", async () => {
-    const calls: WebuiMiniAppAgentCallRequest[] = [];
-    const workflows = createWebuiMiniAppWorkflows({ port: portWith(calls) });
+  /** The application's real selection owner: what a rail click ends up calling. */
+  function selectedStore() {
+    const store = createWebuiSessionStore();
+    return {
+      store,
+      selection: {
+        current: () => store.getSelectedSessionId(),
+        subscribe: store.subscribe,
+      },
+    };
+  }
 
+  it("closes the lease when the rail selects another session, and reopens on return", async () => {
+    const { store, selection } = selectedStore();
+    const calls: WebuiMiniAppAgentCallRequest[] = [];
+    const workflows = createWebuiMiniAppWorkflows({ port: portWith(calls), selection });
+
+    store.select(MINI_SESSION);
+    expect(await workflows.awaitSelection(MINI_SESSION)).toBe(true);
     await workflows.reportShown({
       pluginId: PLUGIN,
-      sessionId: "session-mini",
+      sessionId: MINI_SESSION,
       hostSessionId: HOST_SESSION,
       connection: 1,
     });
     expect(calls.map((call) => call.method)).toEqual(["panelOpened"]);
-    expect(workflows.getSnapshot().agentShown?.sessionId).toBe("session-mini");
 
-    // Re-announcing the same selection changes nothing.
-    workflows.noteSelectedSession("session-mini");
-    expect(calls).toHaveLength(1);
-
-    // Leaving it is the close report, which is what stops its asks being answerable.
-    workflows.noteSelectedSession("another-session");
-    await Promise.resolve();
+    // The rail's own path: `selectSession` → `application.select` → `store.select`.
+    store.select("another-session");
+    await settle();
     expect(calls.map((call) => call.method)).toEqual(["panelOpened", "panelClosed"]);
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
+
+    // Coming back is a new claim, so the runtime is told again.
+    store.select(MINI_SESSION);
+    await settle();
+    await workflows.reportShown({
+      pluginId: PLUGIN,
+      sessionId: MINI_SESSION,
+      hostSessionId: HOST_SESSION,
+      connection: 1,
+    });
+    expect(calls.map((call) => call.method)).toEqual([
+      "panelOpened",
+      "panelClosed",
+      "panelOpened",
+    ]);
+  });
+
+  it("waits for the selection instead of claiming it", async () => {
+    const { store, selection } = selectedStore();
+    const workflows = createWebuiMiniAppWorkflows({ port: portWith([]), selection });
+    const waiting = workflows.awaitSelection(MINI_SESSION, 50);
+    store.select(MINI_SESSION);
+    await expect(waiting).resolves.toBe(true);
+
+    await expect(workflows.awaitSelection("elsewhere", 10)).resolves.toBe(false);
   });
 
   it("does not count a session the runtime refused as shown", async () => {
@@ -474,10 +716,157 @@ describe("the shown presentation", () => {
     const workflows = createWebuiMiniAppWorkflows({ port });
     await workflows.reportShown({
       pluginId: PLUGIN,
-      sessionId: "session-mini",
+      sessionId: MINI_SESSION,
       hostSessionId: HOST_SESSION,
       connection: 1,
     });
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
+  });
+});
+
+describe("the approval rule the runtime applies", () => {
+  /** The runtime's real gateway, bound to the smallest set of ports it needs. */
+  function realGateway() {
+    const gateway = createMiniAppAgentGateway({
+      dataDir: "/tmp/webui-miniapp-gateway",
+      logger: { info: () => undefined, warn: () => undefined },
+      nowMs: () => 1_000,
+    });
+    gateway.bind({
+      createSession: async () => ({ sessionId: MINI_SESSION }),
+      defaultSessionModel: async () => ({
+        selection: { providerId: "p", modelId: "m" } satisfies MiniAppAgentModelSelection,
+      }),
+      resolveModel: async () => ({ providerId: "p", modelId: "m" }),
+      listModels: async () => [],
+      listAgents: async () => [],
+      readSessionModel: async () => ({ providerId: "p", modelId: "m" }),
+      setSessionModel: async () => undefined,
+      getOwner: async () => PLUGIN,
+      resolveMiniAppRoot: async (sessionId: string) => ({
+        rootSessionId: sessionId,
+        pluginId: PLUGIN,
+      }),
+      runTurn: () => new Promise(() => undefined),
+      answerQuestion: () => new Promise(() => undefined),
+      replyPermission: async () => "processed",
+      subscribePermissionAsks: () => () => undefined,
+    } as never);
+    gateway.registerArena({
+      pluginId: PLUGIN,
+      processGeneration: "gen-1",
+      policy: { kind: "allowlist", capabilities: ["session.run"], maxConcurrent: 1 },
+    });
+    return gateway;
+  }
+
+  const LINEAGE = { miniApp: true } as const;
+
+  it("denies an ask while nothing shows the session, and answers once a panel does", async () => {
+    const gateway = realGateway();
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(true);
+
+    gateway.panelOpened({ sessionId: MINI_SESSION, hostSessionId: HOST_SESSION });
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(false);
+
+    gateway.panelClosed({ sessionId: MINI_SESSION, hostSessionId: HOST_SESSION });
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(true);
+  });
+
+  it("counts a run that is still listening even with no panel on screen", async () => {
+    const gateway = realGateway();
+    const run = gateway.run(
+      { pluginId: PLUGIN, processGeneration: "gen-1", source: "page", hostSessionId: HOST_SESSION },
+      // Continuing a session takes the stored model, so no host session is resolved.
+      { text: "long", sessionId: MINI_SESSION },
+      { onEvent: () => undefined },
+    );
+    run.catch(() => undefined);
+    await settle();
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(false);
+  });
+
+  it("stops answering after a stop, and a restart cannot revive the old panel", async () => {
+    const gateway = realGateway();
+    const { connections, runs, panels } = registries();
+    connections.register({ pluginId: PLUGIN, runId: "gen-1" });
+
+    const agentEntries = createMiniAppAgentHandlerEntries(
+      agentPort({
+        panelOpenedMiniAppAgentSession: async (input: { sessionId: string; hostSessionId: string }) =>
+          gateway.panelOpened(input),
+        panelClosedMiniAppAgentSession: async (input: { sessionId: string; hostSessionId: string }) =>
+          gateway.panelClosed(input),
+        runMiniAppAgentTurn: ({ signal }: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () =>
+              reject(Object.assign(new Error("aborted"), { code: "REQUEST_CANCELLED" })),
+            );
+          }),
+      }),
+      { connections, runs, panels },
+    );
+
+    // A page shows a session and starts a turn it is listening to.
+    await agentEntries.get("miniAppAgentCall")!.handle(
+      { requestId: "wire-1" },
+      {
+        pluginId: PLUGIN,
+        hostSessionId: HOST_SESSION,
+        connection: 1,
+        requestId: "call-1",
+        method: "panelOpened",
+        targetSessionId: MINI_SESSION,
+      },
+    );
+    const turn = (await agentEntries
+      .get("watchMiniAppAgentTurn")!
+      .handle({ requestId: "wire-2" }, BODY)) as {
+      stream: { source: AsyncIterable<WebuiMiniAppAgentTurnFrame> };
+    };
+    const frames: WebuiMiniAppAgentTurnFrame[] = [];
+    const consuming = (async () => {
+      for await (const frame of turn.stream.source) frames.push(frame);
+    })();
+    await settle();
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(false);
+
+    // A stop: the panel record is closed with the runtime before the generation is
+    // revoked, and the followed turn is aborted.
+    const stopEntries = createMiniAppHandlerEntries(
+      {
+        listMiniApps: async () => ({ miniApps: [] }),
+        openMiniApp: async () => {
+          throw new Error("not used");
+        },
+        stopMiniApp: async () => undefined,
+        panelClosedMiniAppAgentSession: async (input: {
+          sessionId: string;
+          hostSessionId: string;
+        }) => gateway.panelClosed(input),
+      } as unknown as WebuiHarnessPort,
+      { connections, panels, runs },
+    );
+    await stopEntries.get("stopMiniApp")!.handle({ requestId: "wire-3" }, { pluginId: PLUGIN });
+    await consuming;
+
+    expect(frames).toEqual([{ kind: "failure", code: "cancelled" }]);
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(true);
+
+    // Restart: a new generation, and the old connection cannot act as this plugin.
+    connections.register({ pluginId: PLUGIN, runId: "gen-2" });
+    const stale = (await agentEntries.get("miniAppAgentCall")!.handle(
+      { requestId: "wire-4" },
+      {
+        pluginId: PLUGIN,
+        hostSessionId: HOST_SESSION,
+        connection: 1,
+        requestId: "call-2",
+        method: "panelOpened",
+        targetSessionId: MINI_SESSION,
+      },
+    )) as { body: { ok: boolean; code?: string } };
+    expect(stale.body).toEqual({ ok: false, code: "runtime_unavailable" });
+    expect(await gateway.shouldDenyApproval(MINI_SESSION, LINEAGE)).toBe(true);
   });
 });

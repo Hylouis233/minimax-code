@@ -705,6 +705,9 @@ export interface WebuiHarnessPort {
  * what keeps "this host has no Mini Apps" recognisable to a client regardless of
  * which of the two noticed it.
  */
+export const MINIAPP_CAPABILITY_ABSENT =
+  "runtime host does not expose the Mini App capability";
+
 /**
  * The identity one Mini App page's call runs as.
  *
@@ -720,9 +723,6 @@ export interface WebuiMiniAppAgentCaller {
   /** The session whose view framed the page; absent when the view names none. */
   readonly hostSessionId?: string;
 }
-
-export const MINIAPP_CAPABILITY_ABSENT =
-  "runtime host does not expose the Mini App capability";
 
 /**
  * One Mini App launch, as the runtime hands it over.

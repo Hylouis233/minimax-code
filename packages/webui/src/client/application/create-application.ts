@@ -865,7 +865,16 @@ export function createWebuiApplication(
   // The Mini App business's owner. It reads the Mini App capability and the
   // package lifecycle, because the catalogue's apps area performs both: a Mini App
   // is a plugin, so enabling or uninstalling one is a plugin write.
-  const miniAppWorkflows = createWebuiMiniAppWorkflows({ port: slices.miniapp });
+  const miniAppWorkflows = createWebuiMiniAppWorkflows({
+    port: slices.miniapp,
+    // The store is the shell's selection owner: a rail click, a fork and a delete
+    // all land there, and none of them touches the URL hash. The Mini App business
+    // reads it so a page's shown session is closed the moment the person leaves it.
+    selection: {
+      current: () => store.getSelectedSessionId(),
+      subscribe: store.subscribe,
+    },
+  });
   // The composer's view of what is installed and what the agent can run: a
   // separate read model from `pluginWorkflows` on purpose, so neither overwrites
   // the other when one reloads.

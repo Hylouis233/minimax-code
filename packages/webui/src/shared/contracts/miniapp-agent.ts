@@ -37,10 +37,8 @@ import type {
   MiniAppAgentRunResult,
 } from "@mavis/shared/miniapp-surface";
 import {
-  isMiniAppAgentBusyReason,
   isMiniAppAgentPermissionDecision,
   isMiniAppAgentRequestId,
-  MINIAPP_AGENT_FAILURE_CODES,
   MINIAPP_AGENT_MAX_ANSWERS,
   MINIAPP_AGENT_MAX_ANSWER_TEXT_LENGTH,
   MINIAPP_AGENT_MAX_REQUEST_ID_LENGTH,
@@ -389,16 +387,6 @@ export function readWebuiMiniAppAgentCallRequest(
     default:
       return undefined;
   }
-}
-
-/** Whether a string is one of the closed failure codes the page may receive. */
-export function isWebuiMiniAppAgentFailureCode(value: unknown): value is MiniAppAgentFailureCode {
-  return (MINIAPP_AGENT_FAILURE_CODES as readonly unknown[]).includes(value);
-}
-
-/** Whether a value is a well-formed busy reason; anything else is dropped, not forwarded. */
-export function readWebuiMiniAppAgentBusyReason(value: unknown): MiniAppAgentBusyReason | undefined {
-  return isMiniAppAgentBusyReason(value) ? value : undefined;
 }
 
 /** Re-exported so one module states the page's bounds as well as its shapes. */

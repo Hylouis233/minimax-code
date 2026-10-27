@@ -50,10 +50,6 @@ import {
   webuiMiniAppBridgeSenderAllowed,
 } from "../application/miniapp-bridge.js";
 import { createWebuiMiniAppAgentBridge } from "../application/miniapp-agent-bridge.js";
-import {
-  readSessionIdFromHash,
-  subscribeToSessionHash,
-} from "../../../bindings/navigation.js";
 import { sessionHash } from "../../../projection/common/router.js";
 import {
   webuiMiniAppRefusalText,
@@ -111,6 +107,16 @@ export function MiniAppView({
    */
   const detached = !standalone && row?.detached === true;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  /**
+   * The bridge this view currently answers through, and how many documents it has
+   * framed.
+   *
+   * A page can navigate itself, and that destroys the pending map inside the
+   * document it was running in. The count is what tells the first load (this
+   * view's own document arriving) from a later one (the page replacing itself).
+   */
+  const agentHostRef = useRef<ReturnType<typeof createWebuiMiniAppAgentBridge> | null>(null);
+  const frameLoadsRef = useRef(0);
 
   /**
    * Present the Mini App here, or wait for the standalone tab that holds it.
@@ -275,12 +281,18 @@ export function MiniAppView({
             if (typeof window !== "undefined") {
               window.location.hash = sessionHash(response.sessionId);
             }
-            await workflows.reportShown({
-              pluginId,
-              sessionId: response.sessionId,
-              hostSessionId,
-              connection,
-            });
+            // Shown means the rail selected it, not that this document asked. The
+            // report waits for the selection to land; a selection that never
+            // arrives reports nothing, so the runtime is never told a panel exists
+            // that the person cannot see.
+            if (await workflows.awaitSelection(response.sessionId)) {
+              await workflows.reportShown({
+                pluginId,
+                sessionId: response.sessionId,
+                hostSessionId,
+                connection,
+              });
+            }
           }
           return response;
         },
@@ -288,6 +300,8 @@ export function MiniAppView({
           workflows.watchAgentTurn(request, onFrame, onFailure),
       },
     });
+    agentHostRef.current = agentHost;
+    frameLoadsRef.current = 0;
     const onMessage = (event: MessageEvent): void => {
       agentHost.handleMessage(
         { data: event.data, origin: event.origin, source: event.source },
@@ -295,13 +309,9 @@ export function MiniAppView({
       );
     };
     window.addEventListener("message", onMessage);
-    const unsubscribe = subscribeToSessionHash((id) => workflows.noteSelectedSession(id));
-    // The selection at mount is the baseline: a shown session from a previous
-    // document must not be re-reported, and one already switched away is closed.
-    workflows.noteSelectedSession(readSessionIdFromHash(window.location.hash));
     return () => {
       window.removeEventListener("message", onMessage);
-      unsubscribe();
+      agentHostRef.current = null;
       agentHost.close();
       // Nothing shows it any more, so the runtime stops counting it as answerable.
       workflows.releaseShown(pluginId);
@@ -352,6 +362,18 @@ export function MiniAppView({
           data-testid="miniapp-view-frame"
           title={title ?? name}
           src={presentation.viewUrl}
+          onLoad={() => {
+            frameLoadsRef.current += 1;
+            // The first load is this view's own document. A later one is a
+            // navigation the page made, so the generation that answered it is
+            // closed before the replacement document can call: its live turns are
+            // cancelled and the shown lease is released, because nothing on screen
+            // shows that session any more.
+            if (frameLoadsRef.current > 1) {
+              agentHostRef.current?.handleDocumentReplaced();
+              workflows?.releaseShown(pluginId);
+            }
+          }}
         />
       ) : null}
       {canMove ? (

@@ -47,6 +47,7 @@ import {
   watchMiniAppAgentTurnOperation,
 } from "../miniapp-agent.js";
 import type { MiniAppAgentConnections } from "../../miniapp/agent-connections.js";
+import type { MiniAppAgentPanels } from "../../miniapp/agent-panels.js";
 import type { MiniAppAgentRuns } from "../../miniapp/agent-runs.js";
 
 type BodyOf<Descriptor> = Descriptor extends {
@@ -173,6 +174,13 @@ export interface MiniAppAgentHandlerOptions {
   readonly connections: MiniAppAgentConnections;
   /** The turns in flight, so a page's cancellation can reach one. */
   readonly runs: MiniAppAgentRuns;
+  /**
+   * The sessions the runtime has been told are on screen.
+   *
+   * Shared with the stop handler, which closes them before it revokes the
+   * generation: after the revoke the client could no longer deliver a close report.
+   */
+  readonly panels: MiniAppAgentPanels;
 }
 
 /** One followed turn, as a stream of progress events and one settlement. */
@@ -213,11 +221,9 @@ async function* turnSource(
   }
 
   const queue = createFrameQueue<WebuiMiniAppAgentTurnFrame>();
-  const cancelled = { asked: false };
   let watchdog: ReturnType<typeof setTimeout> | undefined;
 
   run.onCancelled(() => {
-    cancelled.asked = true;
     // The runtime settles an aborted turn itself when it can; the watchdog only
     // exists for the case where it never does.
     watchdog = setTimeout(() => {
@@ -363,18 +369,34 @@ export function createMiniAppAgentHandlerEntries(
             },
           };
         }
-        case "panelOpened":
+        case "panelOpened": {
+          const sessionId = body.targetSessionId ?? "";
           await facade.panelOpenedMiniAppAgentSession({
-            sessionId: body.targetSessionId ?? "",
+            sessionId,
+            hostSessionId: body.hostSessionId,
+          });
+          // Recorded here, on the runtime's acceptance: a panel it refused is not
+          // a panel this service may claim a stop has to close.
+          options.panels.opened({
+            pluginId: body.pluginId,
+            sessionId,
             hostSessionId: body.hostSessionId,
           });
           return { body: { ok: true, method: "panelOpened" } };
-        case "panelClosed":
+        }
+        case "panelClosed": {
+          const sessionId = body.targetSessionId ?? "";
           await facade.panelClosedMiniAppAgentSession({
-            sessionId: body.targetSessionId ?? "",
+            sessionId,
+            hostSessionId: body.hostSessionId,
+          });
+          options.panels.closed({
+            pluginId: body.pluginId,
+            sessionId,
             hostSessionId: body.hostSessionId,
           });
           return { body: { ok: true, method: "panelClosed" } };
+        }
         default:
           return { body: { ok: false, code: "not_permitted" } };
       }
