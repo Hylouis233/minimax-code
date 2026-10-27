@@ -563,5 +563,63 @@
   @keyframes webui-panel-enter-right { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes webui-popover-enter { from { opacity: 0; transform: translateY(-6px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @keyframes webui-menu-enter { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  /* The Mini App view (ADR 0020).
+   *
+   * The frame takes the height its host gives it and nothing else: the workspace
+   * tab and the standalone page are both column hosts, and an iframe with no size
+   * of its own collapses to the browser's 300x150 default instead of showing the
+   * page a person came for. `min-height: 0` is what lets the flex item shrink
+   * below its content in both hosts. */
+  .webui-miniapp-view {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--spacing_8);
+    min-height: 0;
+    height: 100%;
+  }
+  .webui-miniapp-view-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: var(--bg_grouped_secondary);
+  }
+  .webui-miniapp-view-status,
+  .webui-miniapp-view-stopped,
+  .webui-miniapp-view-detached {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing_8);
+    margin: 0;
+    color: var(--text_default_secondary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_20);
+  }
+  .webui-miniapp-view-move {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* The standalone page: one Mini App and nothing else, so the document is the
+   * host — full viewport, with the session notice (if any) above the frame. */
+  .webui-miniapp-standalone {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    min-height: 0;
+    background: var(--bg_default_scrim);
+  }
+  .webui-miniapp-standalone-notice {
+    margin: 0;
+    padding: var(--spacing_8) var(--spacing_12);
+    border-bottom: 1px solid var(--border_light);
+    color: var(--text_default_secondary);
+    font-size: var(--size_12);
+    line-height: var(--line_height_20);
+  }
 }
 

@@ -1,10 +1,14 @@
 import type { V1ServiceCompatibility } from '../../compat/v1/runtime.js';
 import { createProcessLocalApplication } from '../index.js';
 import { createProcessLocalMiniAppApplication } from './process-local-miniapp-application.js';
+import { createProcessLocalMiniAppAgentApplication } from './process-local-miniapp-agent-application.js';
 import type { WorkspaceGitService } from '../../service/workspace/index.js';
 
 type ProcessLocalApplicationOptions = Parameters<typeof createProcessLocalApplication>[0];
 type ProcessLocalMiniAppArgs = Parameters<typeof createProcessLocalMiniAppApplication>;
+type ProcessLocalMiniAppAgentGateway = Parameters<
+  typeof createProcessLocalMiniAppAgentApplication
+>[0];
 
 /**
  * Wires the process-local Application facade over owners the runtime has already
@@ -27,13 +31,14 @@ export function composeProcessLocalApplication(input: {
   readonly plugins: ProcessLocalApplicationOptions['plugins'];
   readonly pluginControl: ProcessLocalMiniAppArgs[0];
   readonly miniApp: ProcessLocalMiniAppArgs[1];
+  readonly miniAppAgent?: ProcessLocalMiniAppAgentGateway;
   readonly planEntryEnabled: () => boolean;
   readonly sessionReports?: ProcessLocalApplicationOptions['sessionReports'];
   readonly instructions?: ProcessLocalApplicationOptions['instructions'];
   readonly mcp: ProcessLocalApplicationOptions['peripherals']['mcp'];
   readonly modelProvider: ProcessLocalApplicationOptions['modelProvider'];
 }): ReturnType<typeof createProcessLocalApplication> {
-  return createProcessLocalApplication({
+  const application = createProcessLocalApplication({
     eventBus: input.eventBus,
     usageCommits: input.usageCommits,
     skills: {
@@ -70,4 +75,11 @@ export function composeProcessLocalApplication(input: {
     peripherals: { ...input.compatibility.peripherals, mcp: input.mcp },
     modelProvider: input.modelProvider,
   });
+  // The gateway is the runtime's private admission layer; only this projection reaches a client.
+  return input.miniAppAgent
+    ? {
+        ...application,
+        miniAppAgent: createProcessLocalMiniAppAgentApplication(input.miniAppAgent),
+      }
+    : application;
 }

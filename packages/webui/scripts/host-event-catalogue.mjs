@@ -7,6 +7,22 @@ const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const hostRoot = path.resolve(packageRoot, "../local-runtime-v2/src");
 const output = path.join(packageRoot, "src/shared/contracts/host-event-types.generated.ts");
 const eventName = /^(?:session|message|agent|rotation|content|turn|stream|permission|questionnaire)\.[a-z_.]+$/u;
+/**
+ * The Mini App agent module declares and emits its own run-event vocabulary
+ * (`turn.started`, `message.committed`, `permission.requested`, ...). Those events are
+ * projected to the Mini App page bridge, never written to the host event bus, so a name
+ * shared with a host event does not make one. Excluded per file, not per directory: a
+ * genuine host producer added to the same folder must still be catalogued.
+ */
+const excludedSources = [
+  path.join("service", "miniapp", "agent", "contracts.ts"),
+  path.join("service", "miniapp", "agent", "gateway.ts"),
+  path.join("service", "miniapp", "agent", "session-ports.ts"),
+  path.join("service", "miniapp", "agent", "session-ports-projection.ts"),
+  // The child IPC connector answers those same run frames over the parent/child channel.
+  path.join("service", "miniapp", "process", "host-connector", "host-connector-agent.ts"),
+];
+
 
 /** Collect actual literal declarations with the TypeScript parser, including typed producers. */
 export function collectHostEventTypes(root = hostRoot, read = readFileSync) {
@@ -15,8 +31,12 @@ export function collectHostEventTypes(root = hostRoot, read = readFileSync) {
   function walk(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const filename = path.join(directory, entry.name);
-      if (entry.isDirectory()) { walk(filename); continue; }
+      if (entry.isDirectory()) {
+        walk(filename);
+        continue;
+      }
       if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) continue;
+      if (excludedSources.includes(path.relative(root, filename))) continue;
       files.push(filename);
     }
   }

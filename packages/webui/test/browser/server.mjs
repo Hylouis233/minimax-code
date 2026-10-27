@@ -20,7 +20,13 @@ const server = createServer(async (request, response) => {
   // (`packages/webui/src/server/http/client-assets.ts`); the test server
   // has to as well, or every lazily loaded chunk 404s in the browser suite.
   const isAsset = pathname.startsWith("/assets/");
-  const name = pathname === "/" || pathname === "/index.html" ? "index.html" : path.basename(pathname);
+  // The document routes this client serves. `/miniapp` is ADR 0020's standalone
+  // presentation: the real service maps it to the same bundle
+  // (`packages/webui/src/server/http/router.ts`), so the harness has to as well or
+  // the popup in the browser suite 404s.
+  const isDocument =
+    pathname === "/" || pathname === "/index.html" || pathname === "/archon" || pathname === "/miniapp";
+  const name = isDocument ? "index.html" : path.basename(pathname);
   if (!isAsset && !["index.html", "client.js", "styles.css"].includes(name)) {
     response.writeHead(404).end("not found");
     return;
@@ -30,7 +36,7 @@ const server = createServer(async (request, response) => {
     if (name === "index.html") {
       const html = body.toString().replace(
         "</head>",
-        `<script>window.__WEBUI_TEST_SERVER_ID__=${JSON.stringify(serverId)};window.__WEBUI_CONFIG__={websocketUrl:"ws://fixture.invalid",token:"synthetic-token"};(${installFixtureTransport.toString()})();for(const setup of window.__WEBUI_FIXTURE_SETUP__??[])setup();</script></head>`,
+        `<script>window.__WEBUI_TEST_SERVER_ID__=${JSON.stringify(serverId)};window.__WEBUI_CONFIG__={websocketUrl:"ws://127.0.0.1:${port}",token:"synthetic-token"};(${installFixtureTransport.toString()})();for(const setup of window.__WEBUI_FIXTURE_SETUP__??[])setup();</script></head>`,
       );
       body = Buffer.from(html);
     }

@@ -140,7 +140,10 @@ import {
 import {
   composeMiniAppRuntimeCapability,
   createDeferredRuntimeOwnersLifecycle,
+  createMiniAppAgentGateway,
+  createMiniAppAgentSessionPorts,
   resolveRuntimeMiniAppOptions,
+  type BindableMiniAppAgentGateway,
   type RuntimeMiniAppServiceOptions,
   type RuntimeMiniAppServices,
 } from "./service/miniapp/index.js";
@@ -202,6 +205,7 @@ import {
   requireAgentRuntime,
   requireTurnSystem,
   type AgentHostRuntimeLifecycle,
+  type LocalTurnMiniAppApprovalRouter,
   type ToolResultCompactionConfig,
   type TurnSystemOwner,
   type SystemPromptOverrides,
@@ -391,6 +395,8 @@ interface InitializedRuntimeServiceOwners {
   readonly cron: InitializedCronService | undefined;
   readonly plugin: ReturnType<typeof initializePluginService>;
   readonly miniAppComposition: RuntimeMiniAppComposition;
+  /** Mini App Agent admission; absent when the Mini App service is off for this owner. */
+  readonly miniAppAgent: BindableMiniAppAgentGateway | undefined;
   readonly mcp: InitializedMcpService;
   readonly agentApplication: AgentApplication;
   readonly runtimeConversation: RuntimeConversation;
@@ -480,7 +486,11 @@ export async function createRuntimeServices(
     ),
     inspector,
     internalTurnPromptReads,
-    miniappAvailable: resolveRuntimeMiniAppOptions(options) !== undefined,
+    miniappAvailable:
+      resolveRuntimeMiniAppOptions({
+        ...options,
+        miniAppService: options.ownerPolicy?.wiring.miniAppService,
+      }) !== undefined,
     browserUse: browserUseComposition.service,
     promptSnapshots,
     globalInstructions,
@@ -505,6 +515,7 @@ export async function createRuntimeServices(
     processStartedAtMs,
     product,
     preparation,
+    modelProviderApplication,
     sessionSystem,
     pinService,
     canvas,
@@ -547,6 +558,8 @@ export async function createRuntimeServices(
     plugins: owners.plugin.plugin,
     pluginControl: owners.plugin,
     miniApp: owners.miniAppComposition.services.miniApp,
+    // The composed facade carries the client-facing agent operations, never the gateway itself.
+    miniAppAgent: owners.miniAppAgent,
     planEntryEnabled,
     sessionReports: sessionSystem.reporting,
     instructions: {
@@ -669,6 +682,12 @@ async function initializeRuntimeServiceOwners(
   input: RuntimeServiceOwnerInitializationInput,
 ): Promise<InitializedRuntimeServiceOwners> {
   const pluginLogger = resolvePluginServiceLogger(input.options.logger);
+  // Resolved once: the supervisor and its agent gateway read the same availability answer.
+  const miniAppOptions = resolveRuntimeMiniAppOptions({
+    ...input.options,
+    miniAppService: input.options.ownerPolicy?.wiring.miniAppService,
+  });
+  const miniAppAgent = miniAppOptions ? createRuntimeMiniAppAgent(input, pluginLogger) : undefined;
   let plugin: ReturnType<typeof initializePluginService> | undefined;
   let mcp: InitializedMcpService | undefined;
   let turnSystem: TurnSystemOwner | undefined;
@@ -699,11 +718,19 @@ async function initializeRuntimeServiceOwners(
     );
     bindTaskAgentBindingCapture(input, { plugin, mcp }, pluginLogger);
     miniAppComposition = await composeMiniAppRuntimeCapability({
-      options: resolveRuntimeMiniAppOptions(input.options),
+      options: miniAppOptions
+        ? {
+            ...miniAppOptions,
+            // Honor an explicit Mini App option; otherwise report the runtime
+            // owner that actually holds the process lease (WebUI, Electron, TUI).
+            ownerClient: miniAppOptions.ownerClient ?? input.options.ownerPolicy.kind,
+          }
+        : undefined,
       db: input.options.db,
       dataDir: input.options.dataDir,
       nowMs: input.nowMs,
       plugin,
+      ...(miniAppAgent ? { agentGateway: miniAppAgent } : {}),
       readyOwners: input.readyOwners,
       closeOwners: input.closeOwners,
     });
@@ -767,6 +794,7 @@ async function initializeRuntimeServiceOwners(
       disposeMcpSession: (sessionId) => mcpRuntime.disposeSession(sessionId),
       goalVerifierExtension: subagentVerification.extension,
       goalVerifierOutputTokenCap: subagentVerification.outputTokenCap,
+      ...(miniAppAgent ? { miniAppApprovals: miniAppAgent } : {}),
     });
     const sessionApplications = await initializeSessionApplications(
       input,
@@ -774,6 +802,9 @@ async function initializeRuntimeServiceOwners(
       plugin,
       (sessionId) => cron?.isSessionOwnedByDefinition(sessionId) ?? false,
     );
+    // Ports last: they read the session applications the turn owner just built.
+    if (miniAppAgent)
+      bindMiniAppAgentSessions(miniAppAgent, input, turnSystem, sessionApplications);
     cron = input.enableCron
       ? initializeRuntimeCron(
           input,
@@ -815,6 +846,7 @@ async function initializeRuntimeServiceOwners(
       cron,
       plugin,
       miniAppComposition,
+      miniAppAgent,
       mcp,
       agentApplication: sessionApplications.agentApplication,
       runtimeConversation: sessionApplications.runtimeConversation,
@@ -833,6 +865,65 @@ async function initializeRuntimeServiceOwners(
     });
     throw error;
   }
+}
+
+/** Created before the turn system: its permission gate consults the gateway's listeners. */
+function createRuntimeMiniAppAgent(
+  input: RuntimeServiceOwnerInitializationInput,
+  logger: ReturnType<typeof resolvePluginServiceLogger>,
+): BindableMiniAppAgentGateway {
+  return createMiniAppAgentGateway({ dataDir: input.options.dataDir, logger, nowMs: input.nowMs });
+}
+
+/**
+ * Binds the gateway to this runtime's own records, turns and questionnaire/permission owners.
+ *
+ * Two shapes differ from the shipped wiring: the questionnaire compat entry is a factory
+ * (`createService()`), and a pending questionnaire is a record whose `.request` is the wire payload.
+ * Both adapters stay here in composition, so the ports keep their seam-level contract.
+ */
+function bindMiniAppAgentSessions(
+  gateway: BindableMiniAppAgentGateway,
+  input: RuntimeServiceOwnerInitializationInput,
+  turnSystem: TurnSystemOwner,
+  sessionApplications: Awaited<ReturnType<typeof initializeSessionApplications>>,
+): void {
+  const questionnaires = input.options.compatibility.questionnaires.createService();
+  const permissions = input.options.compatibility.peripherals.permissions;
+  gateway.bind(
+    createMiniAppAgentSessionPorts({
+      records: input.sessionSystem.sessions.records,
+      lifecycle: sessionApplications.sessionApplications.session.lifecycle,
+      repository: input.sessionSystem.sessions.repository,
+      turns: turnSystem.turns,
+      stream: input.sessionSystem.stream,
+      messages: input.sessionSystem.messages.repository,
+      questionnaires: {
+        getPending: async ({ agentName, sessionId }) =>
+          (await questionnaires.getPending({ agentName, sessionId }))?.request,
+        reply: ({ agentName, requestId, answers, submittedAt }) =>
+          questionnaires.reply({
+            agentName,
+            requestId,
+            reply: { schemaVersion: 2, requestId, answers: [...answers], submittedAt },
+          }),
+      },
+      permissions: {
+        listPending: async () =>
+          (await permissions.listPending()).map(({ requestId, sessionId }) => ({
+            requestId,
+            sessionId,
+          })),
+        reply: ({ requestIds, decision }) => permissions.reply({ requestIds, decision }),
+      },
+      eventBus: input.options.eventBus,
+      logger: resolvePluginServiceLogger(input.options.logger),
+      modelConfig: input.product.preparation.configBuilder.config,
+      models: { list: () => input.modelProviderApplication.list() },
+      agents: sessionApplications.agentApplication,
+      nowMs: input.nowMs,
+    }),
+  );
 }
 
 type PromptBoundRuntimeServiceOwnerInput = Omit<
@@ -889,6 +980,8 @@ interface RuntimeServiceOwnerInitializationInput
   readonly product: ProductionSessionComposition["product"];
   readonly preparation: ProductionSessionComposition["preparation"];
   readonly sessionSystem: SessionSystemOwner;
+  /** Read lazily by the Mini App Agent ports, so a later model-catalog refresh applies. */
+  readonly modelProviderApplication: ModelProviderApplication;
   readonly pinService: PinService;
   readonly archiveTitleModel: ProductionSessionComposition["archiveTitleModel"];
   readonly facts: ProductionSessionComposition["facts"];
@@ -921,6 +1014,8 @@ interface RuntimeTurnSystemInitializationDeps {
   readonly goalVerifierExtension: GoalSubagentVerifierRuntime["extension"];
   /** Host-clamped attempt cap the verifier child's provider requests must obey. */
   readonly goalVerifierOutputTokenCap: GoalSubagentVerifierRuntime["outputTokenCap"];
+  /** Mini App approval routing; absent when this runtime has no Mini App service. */
+  readonly miniAppApprovals?: LocalTurnMiniAppApprovalRouter;
 }
 
 async function initializeRuntimeTurnSystem(
@@ -934,6 +1029,7 @@ async function initializeRuntimeTurnSystem(
     resumeSessionDeletion,
     goalVerifierExtension,
     goalVerifierOutputTokenCap,
+    miniAppApprovals,
   } = dependencies;
   const llmRetryObserver = createSessionLLMRetryEventObserver(
     input.writeGlobalEvent,
@@ -985,6 +1081,7 @@ async function initializeRuntimeTurnSystem(
         turnFacts,
         pluginHookSessionOwnership,
         turnCapabilities: input.turnCapabilities,
+        ...(miniAppApprovals ? { miniAppApprovals } : {}),
         // `sessionTitle.enabled: false` disables title generation: wire a
         // no-op so no title model request is issued. Read from the injected
         // config source (same as beta/custom_provider above), default on.

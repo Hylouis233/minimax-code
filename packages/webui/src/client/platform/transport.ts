@@ -136,6 +136,13 @@ import {
   OPEN_BROWSER_WEB_TAB_OPERATION_NAME,
   LIST_BROWSER_CAPABILITIES_OPERATION_NAME,
   GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME,
+  LIST_MINI_APPS_OPERATION_NAME,
+  OPEN_MINI_APP_OPERATION_NAME,
+  STOP_MINI_APP_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTATION_OPERATION_NAME,
+  WATCH_MINI_APP_PRESENTER_OPERATION_NAME,
+  WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME,
+  MINI_APP_AGENT_CALL_OPERATION_NAME,
 } from "../../shared/operation-names.js";
 import { createWebuiWire, type WebuiWireOptions } from "./wire.js";
 
@@ -158,7 +165,11 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     watchTerminal,
     watchBrowserFrames,
     watchBrowserWebTabs,
+    watchMiniAppPresentation,
+    watchMiniAppPresenter,
+    watchMiniAppAgentTurn,
     workspaceFileUrl,
+    miniappStandaloneUrl,
     watchEvents,
   } = createWebuiWire(options);
 
@@ -262,6 +273,17 @@ export function createWebuiTransport(options: WebuiTransportOptions): Required<W
     listBrowserCapabilities: () => request(LIST_BROWSER_CAPABILITIES_OPERATION_NAME, {}),
     getBrowserInstallationKey: (body) =>
       request(GET_BROWSER_INSTALLATION_KEY_OPERATION_NAME, body),
+    listMiniApps: () => request(LIST_MINI_APPS_OPERATION_NAME, undefined),
+    openMiniApp: (body) => request(OPEN_MINI_APP_OPERATION_NAME, body),
+    stopMiniApp: (body) => request(STOP_MINI_APP_OPERATION_NAME, body),
+    watchMiniAppPresentation: (body, onFrame, onFailure) =>
+      watchMiniAppPresentation(WATCH_MINI_APP_PRESENTATION_OPERATION_NAME, body, onFrame, onFailure),
+    watchMiniAppPresenter: (onFrame, onFailure) =>
+      watchMiniAppPresenter(WATCH_MINI_APP_PRESENTER_OPERATION_NAME, onFrame, onFailure),
+    watchMiniAppAgentTurn: (body, onFrame, onFailure) =>
+      watchMiniAppAgentTurn(WATCH_MINI_APP_AGENT_TURN_OPERATION_NAME, body, onFrame, onFailure),
+    miniAppAgentCall: (body) => request(MINI_APP_AGENT_CALL_OPERATION_NAME, body),
+    miniappStandaloneUrl,
     createSession: (body) => request(CREATE_SESSION_OPERATION_NAME, body),
     sendMessage: (body, onFrame, onDelivery) =>
       stream(SEND_MESSAGE_OPERATION_NAME, body, onFrame, onDelivery),

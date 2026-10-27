@@ -29,8 +29,12 @@ if (!process.env.WEBUI_SERVER_TSX) {
   const path = await import("node:path");
   const { createWebuiRuntimeHost, createHarnessPortFromHost, createBrowserAdapter, WebuiTerminalManager } =
     await import("../packages/webui/src/runtime/index.ts");
-  const { WebuiService, createOperationRegistry } =
-    await import("../packages/webui/src/server/index.ts");
+  const {
+    WebuiService,
+    createOperationRegistry,
+    createMiniAppProxyRegistry,
+    createMiniAppPresenter,
+  } = await import("../packages/webui/src/server/index.ts");
   const { BrowserBridgeServer } =
     await import("../packages/webui/src/server/browser-bridge/index.ts");
   const dataDir =
@@ -64,6 +68,14 @@ if (!process.env.WEBUI_SERVER_TSX) {
   // tool adapter anywhere else would put the Agent on a second browser, and the
   // panel would show the first.
   const browser = createBrowserAdapter({ dataDir, bridge: browserBridge });
+  // The Mini App presenter and the loopback listeners resolve here, and only
+  // here: the runtime's presenter port lives in the runtime package and the
+  // implementation lives in the server package, which may not import each other,
+  // so this file — outside the layer system — is what joins them. The listeners
+  // go to both the operation registry and the service, which closes them on the
+  // way down.
+  const miniAppPresenter = createMiniAppPresenter({});
+  const miniappProxies = createMiniAppProxyRegistry();
   const assembled = await createWebuiRuntimeHost({
     dataDir,
     appVersion: "webui-dev",
@@ -74,6 +86,9 @@ if (!process.env.WEBUI_SERVER_TSX) {
     // One compact Browser tool over the restricted command set. The detailed
     // per-action tools would re-offer the same actions under their own names.
     browserToolExposure: "compact",
+    // The runtime's Mini App presenter, implemented by this client. Supplied here
+    // because the runtime may not import the server that holds it.
+    miniAppSurface: miniAppPresenter.presenter,
   });
   browser.attachHost(assembled.host);
   // A session's pages are released when the session ends -- deleted, archived
@@ -96,12 +111,15 @@ const port = createHarnessPortFromHost(assembled.host, {
   await browser.initialize();
   const service = new WebuiService({
     port,
-    operations: createOperationRegistry(port, terminal, browser.port, browserBridge),
+    operations: createOperationRegistry(port, terminal, browser.port, browserBridge, miniappProxies, miniAppPresenter),
     terminal,
     tcpPort,
     dev: true,
     clientDir,
     browserBridge,
+    // The service closes every Mini App proxy on the way down; a leaked listener
+    // holds a plugin's derived port, which would make that Mini App unstartable.
+    miniappProxies,
   });
   const info = await service.start();
   console.log(`[webui] server listening at ${info.boundUrl}`);

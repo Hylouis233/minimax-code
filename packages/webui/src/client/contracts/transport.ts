@@ -1,7 +1,7 @@
 // Browser transport — the single bag of methods the foundation app and the
 // composer consume.
 //
-// Composed from the fourteen business capability ports. It
+// Composed from the fifteen business capability ports. It
 // declares no method of its own: every operation lives in exactly one port and
 // this type only joins them. Every method stays optional — `undefined` means
 // "the operation is not wired" (the panel renders the affected area
@@ -28,6 +28,7 @@ import type { AccountPort } from "../features/account/contracts/account-port.js"
 import type { PluginPort } from "../features/plugins/contracts/plugin-port.js";
 import type { TerminalPort } from "../features/terminal/contracts/terminal-port.js";
 import type { BrowserPort } from "../features/browser/contracts/browser-port.js";
+import type { MiniAppPort } from "../features/miniapp/contracts/miniapp-port.js";
 
 export interface WebuiTransport
   extends SessionPort,
@@ -43,4 +44,5 @@ export interface WebuiTransport
     AccountPort,
     PluginPort,
     TerminalPort,
-    BrowserPort {}
+    BrowserPort,
+    MiniAppPort {}

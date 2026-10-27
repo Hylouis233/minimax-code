@@ -93,8 +93,11 @@ content, the boundary is lexical, and a diff whose workspace root the client doe
 withheld. ADR 0025 records the layout as adapting to the width it has: the surface's width is a
 budget that the conversation column keeps a floor of while the tool regions give way, no region
 reserves layout width it is not using, every shape change answers to one threshold contract shared
-by the stylesheet and the resize logic, and the zones degrade differently. A new decision takes the
-next free number.
+by the stylesheet and the resize logic, and the zones degrade differently. ADR 0026 records the
+composer's keyboard bindings as the settings page stores them: one canonical notation, the
+settings page owns the change, the composer reads the stored binding when a key is pressed, and only
+the actions that already have keyboard meaning are bindable. A new decision takes the next free
+number.
 
 | Retired | Was | Why it is not in the log | Where the live facts are |
 | --- | --- | --- | --- |

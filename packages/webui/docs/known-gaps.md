@@ -4,7 +4,8 @@ Capabilities the WebUI does not have, verified against the tree. Each entry says
 how, and what remains unverified. "Not implemented" and "not decided" are different states and are
 kept apart here; the undecided ones are also in `open-questions.md`.
 
-Last verified: 2026-10-27, against `webui` at `d9593276`. This list covers capabilities; open
+Last verified: 2026-10-27, against `webui` at `d9593276` with the Mini App hosting stack
+from `origin/webui` at `ba946c06`. This list covers capabilities; open
 decisions are in [`open-questions.md`](open-questions.md).
 
 ## 1. Connector and App tools depend on a beta feature, and on the model finding them
@@ -43,11 +44,12 @@ them. They are listed so a future reader does not rediscover them as wiring gaps
 
 | Site | Gate | What the WebUI does not get |
 | --- | --- | --- |
-| `local-runtime-v2/src/service/miniapp/composition.ts` | `runtimeOwnerKind !== 'electron'` → `undefined` | The miniapp service |
 | `local-runtime-v2/src/runtime.ts` (`greetingEnabled`) | `runtimeOwnerKind === 'electron'` | The startup greeting |
 | `local-runtime-v2/src/service/llm-context-inspector/initialize.ts` | `runtimeOwnerKind === 'tui'` plus `MAVIS_TUI_LLM_CONTEXT_INSPECTOR=1` | The context inspector (the terminal client can opt in; the WebUI cannot) |
 
-The miniapp and inspector gates are service-availability decisions, not client-policy bugs.
+The inspector gate is a service-availability decision, not a client-policy bug. Mini App service
+availability is driven by the runtime owner's `wiring.miniAppService` cell, including the WebUI row;
+the service composition no longer compares `runtimeOwnerKind` directly.
 
 ## 3. The data directory is displayed, not relocated
 
@@ -118,35 +120,7 @@ The bridge's **restricted action set is otherwise the same 28 actions** the isol
 executes, and both are executed by Browser Core — one implementation over two transports. See
 [`browser-use/10-browser-core-integration.md`](browser-use/10-browser-core-integration.md).
 
-## 9. The Mini App capability is not reachable from this client
-
-The runtime owns a Mini App service — a supervisor, a node runtime that spawns the Mini App's own
-process, a plugin package reader, and a session Mini App lifecycle. None of it is reachable from
-the WebUI:
-
-- `local-runtime-v2/src/service/miniapp/composition.ts` returns no options unless the runtime owner
-  kind is `electron`, so in the WebUI process the Mini App supervisor is never initialized and
-  `miniappAvailable` is false.
-- `CliService` has no Mini App method, so there is no client entry for the capability the runtime
-  already owns in `application/session/process-local-miniapp-application.ts`.
-- The client has no Mini App view, no proxy, and no page bridge.
-
-The Mini App contract in this repository is also one generation behind the implementation shipped
-in the desktop client: `packages/shared/src/miniapp-surface.ts` here is 54 lines against 1267
-there, and this repository's runtime has no credential guard on the Mini App's own HTTP server.
-The newer contract is in neither this repository nor the public upstream tree, so it does not
-arrive by synchronization. The accepted direction for this client — which generation of the contract
-is taken, what the bridge carries, where the view lives and how a standalone presentation is
-tracked — is in [ADR 0020](adr/0020-webui-miniapp-view-and-runtime-seams.md).
-
-The owner-kind gate is also decided in the wrong place. The runtime owner policy resolves once per
-host and drives the other owner-derived service gates — cron, channels, the scheduler — from its
-cells, while the Mini App gate compares the raw kind string inside its own service
-(`local-runtime-v2/src/service/miniapp/composition.ts`). That is why §2 lists it as a branch no
-change to this client's row can reach. The accepted shape moves the Mini App service into the
-policy as a wiring cell this client's row carries.
-
-## 10. A symlink out of the workspace is not detectable by the diff boundary
+## 9. A symlink out of the workspace is not detectable by the diff boundary
 
 **Implemented, with a stated limit.** A turn's diff can name a file outside the workspace, and the
 client now withholds that file's body: the entry keeps its name, its status and its line counts,

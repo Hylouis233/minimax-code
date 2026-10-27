@@ -622,6 +622,29 @@ export function installFixtureTransport() {
         });
         return;
       }
+      if (frame.operation === "watchMiniAppPresentation") {
+        // ADR 0020's lease: one frame, and then the socket is held open for as
+        // long as the document lives. A fixture cannot observe a real socket
+        // close, so the release half is proven in `miniapp-operations.test.ts`;
+        // what this proves is the client's half — a standalone document takes the
+        // lease, and the inline document reads `detached` off the catalogue.
+        const scripted = responses.get("watchMiniAppPresentation");
+        this.respond(frame, { stream: true });
+        this.streamFrame({
+          pluginId: frame.body?.pluginId,
+          sessionId: frame.body?.sessionId,
+          presentationRevision: scripted?.presentationRevision ?? 1,
+          session: scripted?.session ?? "live",
+        });
+        return;
+      }
+      if (frame.operation === "watchMiniAppPresenter") {
+        this.isMiniAppPresenterWatch = true;
+        this.respond(frame, { stream: true });
+        const intent = responses.get("watchMiniAppPresenter");
+        if (intent) this.streamFrame(intent);
+        return;
+      }
       if (frame.operation === "watchTerminal") {
         // The terminal watch is a stream of `WebuiTerminalFrame`s, and unlike a
         // turn stream it stays open for the life of the process. It is marked
@@ -725,6 +748,14 @@ export function installFixtureTransport() {
     pending,
     setResponse(operation, value) { responses.set(operation, clone(value)); },
     refuseOperation(operation, code, message) { refusals.set(operation, { code, message }); },
+    /**
+     * Answers an operation again after `refuseOperation`.
+     *
+     * A runtime refusal is a condition, not a latch: a capacity refusal ends
+     * when a slot is freed, and the next start then succeeds. A fixture that
+     * could only refuse forever would make "stop one, then retry" untestable.
+     */
+    allowOperation(operation) { refusals.delete(operation); },
     setSessions(next) { sessions.splice(0, sessions.length, ...clone(next)); },
     setProjects(next) { projects = clone(next); },
     delayNext(operation, condition) { delayed.push({ operation, condition }); },
@@ -815,6 +846,11 @@ export function installFixtureTransport() {
     emitEvent(event) {
       for (const socket of sockets) if (socket.isWatcher && !socket.closed)
         socket.emit("message", { data: JSON.stringify({ protocolVersion: 1, kind: "event", requestId: socket.request.requestId, body: clone(event) }) });
+    },
+    emitMiniAppPresenter(intent) {
+      for (const socket of sockets) {
+        if (socket.isMiniAppPresenterWatch && !socket.closed) socket.streamFrame(clone(intent));
+      }
     },
     emitStream(sessionId, streamFrame) {
       for (const socket of sockets) if (socket.isStream && socket.request?.body?.id === sessionId && !socket.closed) socket.streamFrame(streamFrame);

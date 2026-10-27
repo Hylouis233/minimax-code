@@ -12,13 +12,15 @@ export { subscribeToSessionHash } from "./bindings/navigation.js";
 import { createWebuiTransport } from "./platform/transport.js";
 import { importWebuiSessionFile } from "./platform/session-import.js";
 import { startWebuiSessionTransferDownload } from "./platform/session-transfer-download.js";
-import { route } from "./projection/common/router.js";
+import { route, miniAppDeepLink, type WebuiMiniAppDeepLink } from "./projection/common/router.js";
 import { NotFound } from "./shell/NotFound.js";
 import { ArchonPage } from "./shell/ArchonPage.js";
 import { WebuiErrorBoundary } from "./shell/WebuiErrorBoundary.js";
 import { WebuiStartupFallback } from "./shell/StartupFallback.js";
 import { WebuiBrowserCapabilitiesProvider } from "./bindings/browser-capabilities.js";
 import { createWebuiBrowserDom } from "./platform/browser-dom.js";
+import { MiniAppStandalone } from "./features/miniapp/ui/MiniAppStandalone.public.js";
+import { WebuiMiniAppWorkflowsProvider } from "./features/miniapp/bindings/use-miniapp-workflows.js";
 import {
   createWebuiBrowserStorage,
   getWebuiBrowserStorage,
@@ -36,7 +38,7 @@ declare const document: {
   createElement(tagName: string): HTMLElement;
   readonly body: HTMLElement;
 };
-declare const location: { readonly host: string; readonly pathname: string; readonly hash: string; href: string; reload(): void };
+declare const location: { readonly host: string; readonly pathname: string; readonly search: string; readonly hash: string; href: string; reload(): void };
 
 const WEBUI_STALL_DIAGNOSTIC_PREFIX = "[WEBUI-STALL-DIAG]";
 
@@ -149,12 +151,22 @@ function WebuiClientRoot({
   dataDir,
   storage,
   initialSessionId,
+  standalone,
 }: {
   readonly transport: ReturnType<typeof createWebuiTransport>;
   readonly dataDir?: string;
   readonly storage: ReturnType<typeof createWebuiBrowserStorage>;
   /** The session the initial route names, parsed from the hash by the entry. */
   readonly initialSessionId?: string;
+  /**
+   * The standalone Mini App this document is, when the route says so.
+   *
+   * Present only for `/miniapp?plugin=&session=`. The shell then mounts one
+   * published surface instead of the workspace: ADR 0020's standalone
+   * presentation is the same client with a different composition, not a second
+   * application.
+   */
+  readonly standalone?: WebuiMiniAppDeepLink;
 }): JSX.Element {
   const slices = React.useMemo(
     () => createWebuiPortSlices(transport),
@@ -231,12 +243,23 @@ function WebuiClientRoot({
 
       <WebuiApplicationProvider application={application}>
         <WebuiPortSlicesProvider slices={slices}>
+          {standalone ? (
+            // ADR 0020's standalone presentation: one published surface, the same
+            // owner and the same port slices, and none of the workspace.
+            <WebuiMiniAppWorkflowsProvider workflows={application.miniAppWorkflows}>
+              <MiniAppStandalone
+                pluginId={standalone.pluginId}
+                sessionId={standalone.sessionId}
+              />
+            </WebuiMiniAppWorkflowsProvider>
+          ) : (
           <WebuiClientFoundationApp
           teamModeLabel={teamModeCopy().label}
             label="webui-foundation"
             hostLabel={location.host}
             dataDir={dataDir}
           />
+          )}
         </WebuiPortSlicesProvider>
       </WebuiApplicationProvider>
 
@@ -276,6 +299,11 @@ const browserCapabilities = {
   dom: createWebuiBrowserDom(globalThis.document, globalThis.window),
   storage: createWebuiBrowserStorage(getWebuiBrowserStorage()),
 };
+// The route decides which composition this document is. A standalone Mini App is
+// the same client with a different shell, so it reads its plugin and session from
+// the query and selects nothing: the page shows one Mini App and no conversation.
+const currentRoute = route(location.pathname);
+const standalone = currentRoute === "miniapp" ? miniAppDeepLink(location.search) : undefined;
 // Pass the transport ONCE here so the React effect dependency
 // identity is stable across renders. Each method is still optional
 // on `WebuiTransport`, so the panel branches continue to gate on
@@ -284,14 +312,24 @@ const browserCapabilities = {
 // The transport is the module-scope instance; the application, its store and
 // the port slices are built by the root below, once per mount, and provided to
 // the shell.
-const app = <WebuiClientRoot transport={transport} dataDir={runtimeConfig.dataDir} storage={browserCapabilities.storage} initialSessionId={sessionId} />;
-const currentRoute = route(location.pathname);
+const app = <WebuiClientRoot
+  transport={transport}
+  dataDir={runtimeConfig.dataDir}
+  storage={browserCapabilities.storage}
+  {...(standalone ? { standalone } : { initialSessionId: sessionId })}
+/>;
+/**
+ * A route that resolved to nothing.
+ *
+ * Two cases: a path this client does not serve, and the standalone route without
+ * the plugin and session it is made of. Both are legitimate renders, and neither
+ * is an application failure to retry.
+ */
+const unresolved = currentRoute === "404" || (currentRoute === "miniapp" && !standalone);
 const renderApplication = (): void => root.render(
-  // The boundary wraps the app, not the 404: a 404 is a legitimate render and
-  // must not offer a "retry" that reloads the same missing path.
-  currentRoute === "404" ? <NotFound /> : <WebuiBrowserCapabilitiesProvider value={browserCapabilities}><WebuiErrorBoundary><ArchonPage>{app}</ArchonPage></WebuiErrorBoundary></WebuiBrowserCapabilitiesProvider>,
+  unresolved ? <NotFound /> : <WebuiBrowserCapabilitiesProvider value={browserCapabilities}><WebuiErrorBoundary><ArchonPage>{app}</ArchonPage></WebuiErrorBoundary></WebuiBrowserCapabilitiesProvider>,
 );
-if (currentRoute === "404") renderApplication();
+if (unresolved) renderApplication();
 else void transport.version().then((version) => {
   if (version.protocolVersion !== WEBUI_PROTOCOL_VERSION) {
     throw new WebuiWireError(WebuiErrorCode.protocolMismatch,

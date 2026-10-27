@@ -31,6 +31,7 @@ import { WebuiMarkdown } from "../../transcript/ui/markdown.public.js";
 // port. The strip subscribes to `watchBrowserWebTabs` and, for the active
 // web tab, this file mounts `BrowserPanelHost` with the tab's target.
 import { BrowserPanelHost, WebuiBrowserToolbar } from "../../browser/ui/BrowserPanelHost.public.js";
+import { MiniAppView } from "../../miniapp/ui/MiniAppView.public.js";
 import type {
   WebuiWorkspaceFile,
   WebuiWorkspaceFileContent,
@@ -803,6 +804,22 @@ export function WebuiWorkspacePanel({ state, dispatch, sessionId, workspaceDir, 
       />
       <WebuiWorkspaceLauncher tab={activeTab} dispatch={panelDispatch} sessionId={sessionId} workspaceDir={workspaceDir} />
     </div> : null}
+    {/* A Mini App's page. The mounted component belongs to the Mini App
+        business, which owns the view URL, the runtime state and the page
+        bridge; this panel decides only that the tab is where it goes. */}
+    {tab === "miniapp" && activeTab?.content.kind === "miniapp" ? (
+      <div
+        className="webui-workspace-miniapp-tab"
+        data-testid="workspace-miniapp-tab"
+        data-tab-id={activeTab.id}
+        data-plugin-id={activeTab.content.pluginId}
+      >
+        <MiniAppView
+          pluginId={activeTab.content.pluginId}
+          sessionId={activeTab.content.sessionId}
+        />
+      </div>
+    ) : null}
     {tab === "terminal" ? <div className="webui-terminal-content">
         <div ref={terminalHost} className="webui-xterm-host" />
         {!terminalsReady || !terminalTargetId && (terminalAvailability || terminalError) ? <p role={terminalError ? "alert" : "status"} data-webui-terminal-availability={terminalSupport}>{!terminalsReady ? DESKTOP_COPY.terminalLoading : terminalAvailability ?? terminalError}</p> : null}

@@ -111,18 +111,23 @@ describe("the registry answers for the whole closed set", () => {
       "review",
       "terminal",
       "canvas",
+      "miniapp",
       "files",
     ]);
     expect(tiles.map((tile) => tile.label)).toEqual([
       "变更",
       "终端",
       "画布",
+      "应用",
       "查看文件",
     ]);
     expect(tiles.map((tile) => tile.opens)).toEqual([
       { type: "open-workspace-review" },
       { type: "open-tab", kind: "terminal" },
       { type: "open-tab", kind: "canvas" },
+      // The Mini App tile opens its picker: which Mini App a tab shows is chosen
+      // from the runtime's listing, so this tile carries no plugin id.
+      { type: "open-tab", kind: "miniapp" },
       { type: "open-tab", kind: "files" },
     ]);
     // Every tile names a declared kind, and the order names each one once.

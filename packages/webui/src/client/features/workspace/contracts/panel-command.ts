@@ -48,7 +48,7 @@ export type WorkspacePanelCommand =
    * tile's. Absent means the singleton lookup — one tab per session and
    * directory — which is what every other caller wants.
    */
-  | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceOpenTabKind; readonly sessionId?: string; readonly workspaceDir?: string; readonly tabId?: string }
+  | { readonly type: "open-tab"; readonly kind: WebuiWorkspaceOpenTabKind; readonly sessionId?: string; readonly workspaceDir?: string; readonly tabId?: string; readonly pluginId?: string }
   /**
    * The new tab page's URL box has asked the runtime for a page.
    *
@@ -99,4 +99,4 @@ export type WebuiWorkspaceOpenTabKind = Extract<
  */
 export type WebuiWorkspaceTileOpen =
   | { readonly type: "open-workspace-review" }
-  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" };
+  | { readonly type: "open-tab"; readonly kind: "files" | "canvas" | "terminal" | "miniapp" };
