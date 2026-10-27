@@ -746,6 +746,96 @@ describe("the shown presentation", () => {
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
   });
 
+  it("swallows a transport failure while re-reporting, instead of asking forever", async () => {
+    const { store, selection } = selectedStore();
+    const calls: WebuiMiniAppAgentCallRequest[] = [];
+    let failing = false;
+    const port = {
+      ...portWith(calls),
+      miniAppAgentCall: async (request: WebuiMiniAppAgentCallRequest) => {
+        calls.push(request);
+        // The socket is gone for the re-report. An unhandled rejection here would
+        // fail this file, so the assertion is also the absence of one.
+        if (failing && request.method === "panelOpened") throw new Error("socket closed");
+        return { ok: true as const, method: request.method as "panelOpened" };
+      },
+    } as WebuiMiniAppPortSlice;
+    const workflows = createWebuiMiniAppWorkflows({ port, selection });
+
+    store.select(MINI_SESSION);
+    await workflows.reportShown({
+      pluginId: PLUGIN,
+      sessionId: MINI_SESSION,
+      hostSessionId: HOST_SESSION,
+      connection: 1,
+    });
+    failing = true;
+
+    store.select("another-session");
+    await settle();
+    const afterLeave = calls.length;
+
+    // Coming back re-reports, and that report rejects at the transport.
+    store.select(MINI_SESSION);
+    await settle();
+
+    // The claim is dropped rather than retried on every later notification.
+    expect(workflows.getSnapshot().agentResting).toBeUndefined();
+    expect(workflows.getSnapshot().agentShown).toBeUndefined();
+    store.select("another-session");
+    await settle();
+    store.select(MINI_SESSION);
+    await settle();
+    expect(calls.length).toBe(afterLeave + 1);
+  });
+
+  it("does not claim a session the person left while the report was in flight", async () => {
+    const { store, selection } = selectedStore();
+    const calls: WebuiMiniAppAgentCallRequest[] = [];
+    let hold = false;
+    let release: (() => void) | undefined;
+    const port = {
+      ...portWith(calls),
+      miniAppAgentCall: async (request: WebuiMiniAppAgentCallRequest) => {
+        calls.push(request);
+        if (hold && request.method === "panelOpened") {
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        }
+        return { ok: true as const, method: request.method as "panelOpened" };
+      },
+    } as WebuiMiniAppPortSlice;
+    const workflows = createWebuiMiniAppWorkflows({ port, selection });
+
+    store.select(MINI_SESSION);
+    await workflows.reportShown({
+      pluginId: PLUGIN,
+      sessionId: MINI_SESSION,
+      hostSessionId: HOST_SESSION,
+      connection: 1,
+    });
+    hold = true;
+
+    store.select("another-session");
+    await settle();
+    // The re-report for the return trip is now in flight.
+    store.select(MINI_SESSION);
+    await settle();
+    // ...and the person leaves again before the runtime answers.
+    store.select("another-session");
+    await settle();
+    release?.();
+    await settle();
+
+    // The runtime was told "shown", so it is told "closed" as well; nothing records
+    // a session the rail is not showing as answerable.
+    expect(calls.filter((call) => call.method === "panelClosed")).toHaveLength(2);
+    expect(workflows.getSnapshot().agentShown).toBeUndefined();
+    // The page still wants it, so returning is still a claim.
+    expect(workflows.getSnapshot().agentResting?.sessionId).toBe(MINI_SESSION);
+  });
+
   it("keeps the panels it must close when the stop itself fails", async () => {
     const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-1" });

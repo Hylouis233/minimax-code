@@ -600,6 +600,32 @@ export function createWebuiMiniAppWorkflows(deps: {
     return call(request);
   };
 
+  /**
+   * Tells the runtime one panel is no longer on screen.
+   *
+   * Best effort by this workflow's convention: a close that cannot be delivered is
+   * swallowed, because the runtime's own record is also closed by a stop, and a
+   * rejected report must never become an unhandled rejection.
+   */
+  const closePanel = (panel: WebuiMiniAppAgentPanel): Promise<void> =>
+    agentCall({
+      pluginId: panel.pluginId,
+      hostSessionId: panel.hostSessionId,
+      connection: panel.connection,
+      requestId: `panel-closed-${panel.sessionId}`,
+      method: "panelClosed",
+      targetSessionId: panel.sessionId,
+    })
+      .then(() => undefined)
+      .catch(() => undefined);
+
+  /** Forgets a remembered presentation, when it is still the one remembered. */
+  const dropResting = (panel: WebuiMiniAppAgentPanel): void => {
+    set((current) =>
+      current.agentResting === panel ? { ...current, agentResting: undefined } : current,
+    );
+  };
+
   /** Stops counting one shown session as answerable, and says so. */
   const closeShown = async (
     shown: WebuiMiniAppAgentPanel,
@@ -614,14 +640,7 @@ export function createWebuiMiniAppWorkflows(deps: {
             ...(options.keep ? { agentResting: shown } : {}),
           },
     );
-    await agentCall({
-      pluginId: shown.pluginId,
-      hostSessionId: shown.hostSessionId,
-      connection: shown.connection,
-      requestId: `panel-closed-${shown.sessionId}`,
-      method: "panelClosed",
-      targetSessionId: shown.sessionId,
-    }).catch(() => undefined);
+    await closePanel(shown);
   };
 
   const reportShown: WebuiMiniAppWorkflows["reportShown"] = async (input) => {
@@ -651,24 +670,37 @@ export function createWebuiMiniAppWorkflows(deps: {
     if (reopening) return;
     reopening = true;
     try {
-      const response = await agentCall({
-        pluginId: resting.pluginId,
-        hostSessionId: resting.hostSessionId,
-        connection: resting.connection,
-        requestId: `panel-shown-${resting.sessionId}`,
-        method: "panelOpened",
-        targetSessionId: resting.sessionId,
-      });
+      let response: Awaited<ReturnType<typeof agentCall>>;
+      try {
+        response = await agentCall({
+          pluginId: resting.pluginId,
+          hostSessionId: resting.hostSessionId,
+          connection: resting.connection,
+          requestId: `panel-shown-${resting.sessionId}`,
+          method: "panelOpened",
+          targetSessionId: resting.sessionId,
+        });
+      } catch {
+        // A transport failure is handled like a refusal: the claim could not be
+        // made, and keeping the record would re-ask on every store notification
+        // with no better chance. A page that still wants it can open it again.
+        dropResting(resting);
+        return;
+      }
       if (!response.ok) {
         // The runtime refused to be told this session is shown — a stopped
         // runtime, a revoked generation. Keeping the record would re-ask on every
         // store notification, and nothing this client can do would succeed, so the
         // claim is dropped instead.
-        set((current) =>
-          current.agentResting === resting
-            ? { ...current, agentResting: undefined }
-            : current,
-        );
+        dropResting(resting);
+        return;
+      }
+      // The person may have left while the report was in flight. The runtime has
+      // now been told this session is on screen, so it has to be told otherwise
+      // before this client records a session nobody is looking at as shown.
+      const selection = deps.selection;
+      if (selection && selection.current() !== resting.sessionId) {
+        await closePanel(resting);
         return;
       }
       set((current) =>
