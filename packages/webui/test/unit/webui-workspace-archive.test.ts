@@ -144,6 +144,13 @@ function canRun(command: string): boolean {
 
 const HAS_ZIP = canRun("zip");
 const HAS_TAR = canRun("tar");
+/**
+ * Windows tar builds (MSYS GNU tar) read the drive-letter colon in an absolute
+ * archive path as a `host:file` remote spec and fail with "Cannot connect to
+ * C:". GNU tar's `--force-local` keeps the path local; bsdtar (macOS) needs
+ * no such flag and does not accept it, so it is added on Windows only.
+ */
+const TAR_LOCAL_FLAGS = process.platform === "win32" ? ["--force-local"] : [];
 
 function writeTree(
   name: string,
@@ -188,7 +195,7 @@ function realTar(
   const args = name.endsWith(".tgz")
     ? ["czf", artifactPath(name)]
     : ["cf", artifactPath(name)];
-  execFileSync("tar", [...args, "."], { cwd: source, env: FIXTURE_ENV });
+  execFileSync("tar", [...args, ...TAR_LOCAL_FLAGS, "."], { cwd: source, env: FIXTURE_ENV });
   return artifactPath(name);
 }
 
@@ -766,7 +773,7 @@ describe("workspace archive extraction", () => {
 
 /** A tar containing a symlink, via the CLI (`tar` records typeflag `2`). */
 function realTarLink(name: string, source: string, member: string): string {
-  execFileSync("tar", ["cf", artifactPath(name), member], {
+  execFileSync("tar", ["cf", artifactPath(name), ...TAR_LOCAL_FLAGS, member], {
     cwd: source,
     env: FIXTURE_ENV,
   });
