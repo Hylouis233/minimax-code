@@ -702,6 +702,50 @@ describe("the shown presentation", () => {
     expect(workflows.getSnapshot().agentShown).toBeUndefined();
   });
 
+  it("drops the remembered session when the runtime refuses to be told again", async () => {
+    const { store, selection } = selectedStore();
+    const calls: WebuiMiniAppAgentCallRequest[] = [];
+    let refusals = 0;
+    const port = {
+      ...portWith(calls),
+      miniAppAgentCall: async (request: WebuiMiniAppAgentCallRequest) => {
+        calls.push(request);
+        if (request.method === "panelOpened" && refusals > 0) {
+          return { ok: false as const, code: "runtime_unavailable" as const };
+        }
+        if (request.method === "panelOpened") return { ok: true as const, method: "panelOpened" as const };
+        return { ok: true as const, method: request.method as "panelClosed" };
+      },
+    } as WebuiMiniAppPortSlice;
+    const workflows = createWebuiMiniAppWorkflows({ port, selection });
+
+    store.select(MINI_SESSION);
+    await workflows.reportShown({
+      pluginId: PLUGIN,
+      sessionId: MINI_SESSION,
+      hostSessionId: HOST_SESSION,
+      connection: 1,
+    });
+    refusals = 1;
+
+    // Leaving keeps the record; coming back is refused by the runtime.
+    store.select("another-session");
+    await settle();
+    store.select(MINI_SESSION);
+    await settle();
+    const afterRefusal = calls.length;
+    expect(calls.filter((call) => call.method === "panelOpened")).toHaveLength(2);
+    expect(workflows.getSnapshot().agentResting).toBeUndefined();
+
+    // Once dropped, further snapshot changes do not keep asking.
+    store.select("another-session");
+    await settle();
+    store.select(MINI_SESSION);
+    await settle();
+    expect(calls.length).toBe(afterRefusal);
+    expect(workflows.getSnapshot().agentShown).toBeUndefined();
+  });
+
   it("keeps the panels it must close when the stop itself fails", async () => {
     const { connections, runs, panels } = registries();
     connections.register({ pluginId: PLUGIN, runId: "gen-1" });

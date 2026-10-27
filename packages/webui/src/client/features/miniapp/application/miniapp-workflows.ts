@@ -659,7 +659,18 @@ export function createWebuiMiniAppWorkflows(deps: {
         method: "panelOpened",
         targetSessionId: resting.sessionId,
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        // The runtime refused to be told this session is shown — a stopped
+        // runtime, a revoked generation. Keeping the record would re-ask on every
+        // store notification, and nothing this client can do would succeed, so the
+        // claim is dropped instead.
+        set((current) =>
+          current.agentResting === resting
+            ? { ...current, agentResting: undefined }
+            : current,
+        );
+        return;
+      }
       set((current) =>
         current.agentResting !== resting
           ? current
