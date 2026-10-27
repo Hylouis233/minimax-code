@@ -363,8 +363,15 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(body).toEqual({
         pluginId: VIEW_PLUGIN,
         viewUrl: `http://127.0.0.1:${proxyPort}`,
+        // The generation this start issued: what a page-bridge call must echo to
+        // prove it is still the document being served.
+        connection: 1,
       });
-      expect(Object.keys(body as object).sort()).toEqual(["pluginId", "viewUrl"]);
+      expect(Object.keys(body as object).sort()).toEqual([
+        "connection",
+        "pluginId",
+        "viewUrl",
+      ]);
       const serialised = JSON.stringify(body);
       expect(serialised).not.toContain(CREDENTIAL);
       expect(serialised).not.toContain(MINIAPP_LOOPBACK_TOKEN_HEADER);
@@ -407,7 +414,18 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(starter.records).toHaveLength(2);
       expect(starter.records[0]?.closed).toBe(true);
       expect(starter.records[1]?.closed).toBe(false);
-      expect(first).toEqual(second);
+      // The answer is the same presentation, opened again: same plugin and URL,
+      // and a generation that advanced because a new document is being served.
+      const openedFirst = first as {
+        readonly pluginId: string;
+        readonly viewUrl: string;
+        readonly connection: number;
+      };
+      const openedSecond = second as typeof openedFirst;
+      const { connection: firstConnection, ...firstShape } = openedFirst;
+      const { connection: secondConnection, ...secondShape } = openedSecond;
+      expect(firstShape).toEqual(secondShape);
+      expect(secondConnection).toBe(firstConnection + 1);
       expect((second as { readonly viewUrl: string }).viewUrl).toBe(
         `http://127.0.0.1:${proxyPort}`,
       );
@@ -436,7 +454,18 @@ describe("openMiniApp over a real loopback proxy", () => {
       expect(starter.records).toHaveLength(2);
       expect(starter.records[0]?.closed).toBe(true);
       expect(starter.records.filter((record) => !record.closed)).toHaveLength(1);
-      expect(bodies[0]).toEqual(bodies[1]);
+      // Serialised, not raced: one presentation at a time, so the second call's
+      // generation is the first one's plus one rather than the same answer twice.
+      const openedFirst = bodies[0] as {
+        readonly pluginId: string;
+        readonly viewUrl: string;
+        readonly connection: number;
+      };
+      const openedSecond = bodies[1] as typeof openedFirst;
+      const { connection: firstConnection, ...firstShape } = openedFirst;
+      const { connection: secondConnection, ...secondShape } = openedSecond;
+      expect(firstShape).toEqual(secondShape);
+      expect(secondConnection).toBe(firstConnection + 1);
       expect(calls.stopped).toEqual([]);
     } finally {
       await handle("stopMiniApp", { pluginId: UNREACHABLE_PLUGIN }).catch(() => undefined);

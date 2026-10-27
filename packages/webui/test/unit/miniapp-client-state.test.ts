@@ -208,6 +208,9 @@ describe("the Mini App business", () => {
     expect(workflows.getSnapshot().presentations.app).toEqual({
       kind: "open",
       viewUrl: "http://127.0.0.1:41000",
+      // The fixture's host issues no generation, and the bridge records that as
+      // the unaddressable one rather than inventing a number.
+      connection: 0,
     });
 
     // The runtime stops it while the view is up. One read reconciles the view.

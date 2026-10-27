@@ -45,9 +45,9 @@ describe("WebUI operation bindings", () => {
   it("covers every operation exactly once as a binding or a dedicated handler", () => {
     const bindingNames = Object.keys(WEBUI_OPERATION_BINDINGS);
     expect(bindingNames).toHaveLength(93);
-    expect(DEDICATED_OPERATION_NAMES).toHaveLength(16);
+    expect(DEDICATED_OPERATION_NAMES).toHaveLength(18);
     const all = new Set<string>([...bindingNames, ...DEDICATED_OPERATION_NAMES]);
-    expect(all.size).toBe(109);
+    expect(all.size).toBe(111);
     for (const dedicated of DEDICATED_OPERATION_NAMES)
       expect(bindingNames).not.toContain(dedicated);
   });
