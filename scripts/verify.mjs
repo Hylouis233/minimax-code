@@ -76,8 +76,11 @@ const steps = [
   // used to arrive with the `test:webui-browser` gate, which runs *after*
   // this one, so a suite that needs a browser depended on a later gate
   // having run first. Install it before, so a gate never depends on a later
-  // gate. The Linux browser gate still installs with its system dependencies
-  // and the CJK fonts, because that is what the visual baselines need.
+  // gate. The Linux browser gate still installs with its system dependencies;
+  // the fonts the visual baselines need no longer come from there, because
+  // the gate loads the font files committed under
+  // `packages/webui/test/browser/fonts/` (see
+  // `scripts/lib/webui-font-environment.mjs`).
   { name: "install:webui-browsers", script: "install:webui-browsers" },
   { name: "test:webui", script: "test:webui" },
   { name: "test:webui-browser", script: "test:webui-browser", platforms: ["linux"] },

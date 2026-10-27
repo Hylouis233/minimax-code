@@ -5,7 +5,9 @@
 those built assets from the client output directory and refuses paths outside that directory. Run
 `pnpm build:webui` first; the script installs the
 lockfile-pinned Chromium revision when it is missing, and on Linux also installs Chromium's system
-dependencies, which include the CJK fonts the Chinese UI renders with. The deterministic cases are
+dependencies. The fonts the Chinese UI renders with do not come from those dependencies: the gate
+loads the font files committed under `packages/webui/test/browser/fonts/`, so the rendering does
+not depend on what the machine has installed (see [Determinism](#determinism)). The deterministic cases are
 evidence level 4 in
 [`gates.md`](gates.md): the built client and its transport wiring are real, the server behind them is
 not in the deterministic fixture cases. `native-runtime.spec.mjs` additionally boots the real
@@ -109,8 +111,10 @@ scheme, reduced motion). `visual-baselines.spec.mjs` keeps ten Linux Chromium sc
 eight cases beside the spec for the shell/session rail, transcript/composer, settings dialog,
 progress panel, embedded browser panel, composer command overlay, plugin marketplace, Skill
 marketplace, Skill management list and MCP management list. `plugin-catalogue-layout.spec.mjs`
-adds four Linux screenshots for the add Skill, create Agent, add MCP Server and Git import dialogs.
-Together the repository keeps 14 representative screenshots. The shell case asserts that built
+adds four Linux screenshots for the add Skill, create Agent, add MCP Server and Git import dialogs,
+and `responsive-baselines.spec.mjs` adds ten more for the shell and the workspace panel across the
+widths the layout contract covers. Together the repository keeps 24 representative screenshots.
+The shell case asserts that built
 image assets finish loading successfully. The tests also assert relevant DOM state and viewport
 geometry; screenshots are not the sole oracle. These are deterministic fixture renders with
 synthetic session content, not user workspace or account data. Review image diffs on the pinned
@@ -121,21 +125,36 @@ pnpm build:webui
 pnpm test:webui-browser
 ```
 
-The screenshots are only comparable within one font environment. The gate installs Chromium's
-Linux system dependencies, which include the CJK fonts the Chinese surfaces need; on a runner
-without them the browser has no glyph to draw for Chinese text and renders tofu boxes instead.
-The committed baselines therefore record real Chinese glyphs, and a reviewer reading a diff can
-read the Chinese in it. The same applies in reverse: regenerating the baselines anywhere that
-does not install those fonts produces boxes, and the comparison against the committed baselines
-fails. Treat a font change on the runner as a baseline change, not as a rendering difference to
-be accepted.
+The screenshots are comparable across machines, because the gate does not read the host's fonts.
+The font files under `packages/webui/test/browser/fonts/` are committed to this repository, and
+`scripts/lib/webui-font-environment.mjs` writes a fontconfig that exposes only those files. The
+browser is launched with `FONTCONFIG_FILE` pointing at it, so every name in the client's font
+stack resolves to a committed face. The fontconfig also selects grayscale antialiasing, because
+LCD subpixel rendering colours the glyph edges and that fringe depends on the display's subpixel
+layout and on the host's fontconfig version. A machine with no CJK font installed and a machine
+with a full set of them therefore render the same bytes: the recorded baseline is a property of
+this repository, not of the runner.
+
+That also removes the trap the previous arrangement carried. The gate used to depend on the CJK
+fonts that `playwright install --with-deps chromium` pulled in, so the installed set changed with
+the CI image and a runner without them rendered tofu boxes — a baseline change that was not a
+change in the WebUI. The committed baselines record real Chinese glyphs, and a reviewer reading a
+diff can read the Chinese in it.
+
+The pixel comparison itself allows a small budget. The rasterizer's rounding at a rounded corner
+is not perfectly reproducible: a bubble's right edge lands on a fractional pixel, and whether it
+rounds up or down shifts a handful of antialiased pixels from run to run. Measured over repeated
+runs, the widest such shift is seven pixels. The budget is therefore `maxDiffPixels: 8`, under
+0.001% of a 1434×900 capture, and it cannot hide a layout change: shifting one bubble edge by a
+single pixel already changes nineteen pixels. The DOM and geometry assertions in the specs are
+not subject to this budget and carry the structural claims.
 
 To deliberately regenerate only these baselines, use
 `pnpm exec playwright test packages/webui/test/browser/visual-baselines.spec.mjs --update-snapshots`
 on Linux CI Chromium, inspect every resulting image, then run the same command without
-`--update-snapshots` to compare. Regenerate on a Linux environment that has the gate's fonts
-installed — `pnpm exec playwright install --with-deps chromium` before the run — so the new
-baselines carry the same glyphs the committed ones do. A passing fixture screenshot proves the
+`--update-snapshots` to compare. The font environment is part of the gate, so no extra setup is
+needed to regenerate the baselines — the same files produce the same bytes anywhere. A passing
+fixture screenshot proves the
 built client's rendered
 state under the in-page deterministic transport; it does not prove the production service or runtime
 path. Those boundaries require the integration suites described above.

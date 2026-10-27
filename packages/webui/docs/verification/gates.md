@@ -16,7 +16,7 @@ document: [`browser-suite.md`](browser-suite.md).
 | `pnpm check:webui-boundary` | The combined client/server build graph contains required entries and inputs within declared package roots; direct WebUI workspace imports use exported subpaths; the artifact integrity record matches current inputs and outputs | A retired source path, the terminal renderer, a private direct workspace import, a forbidden internal reference, or a stale/modified build artifact |
 | `pnpm test:webui-package` | The packaged artefact runs as published | Packaging drift |
 | `pnpm test:webui` | The registered WebUI Vitest group (unit, integration and verification-gate tests) | Behaviour change, unregistered new test file |
-| `pnpm test:webui-browser` | Every Playwright spec collected under `packages/webui/test/browser/`: the built client and deterministic in-page transport, plus explicit real-browser bridge and production-host/native-PTY harnesses | Behaviour change in the built bundle, a real bridge path, or native lifecycle |
+| `pnpm test:webui-browser` | Every Playwright spec collected under `packages/webui/test/browser/`: the built client and deterministic in-page transport, plus explicit real-browser bridge and production-host/native-PTY harnesses. The screenshot comparisons run against the font files committed under `packages/webui/test/browser/fonts/`, so their result does not depend on the fonts the machine has installed | Behaviour change in the built bundle, a real bridge path, or native lifecycle |
 | `pnpm check:source` | `release/public-source.json` lists exactly the delivered files | A new, moved or deleted file without inventory regeneration |
 
 `pnpm check:webui-dependency` reads the resolved source graph; `pnpm check:webui-boundary` reads the
